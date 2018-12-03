@@ -4,8 +4,8 @@ A Powershell Module to streamline some common tasks and needs.
 Installation
 ========
 1. If you don't have one already, create a *WindowsPowerShell* folder in your *Documents* folder
-2. If you don't have one already, create a *Module* folder inside the *WindowsPowerShell* folder created in *Step 1*
-3. Clone this repository to the Module folder created in *Step 2*
+2. If you don't have one already, create a *Modules* folder inside the *WindowsPowerShell* folder created in *Step 1*
+3. Clone this repository to the *Modules* folder created in *Step 2*
 4. Launch a Powershell window. The module will automatically load.
 
 Capabilities
