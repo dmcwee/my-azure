@@ -64,14 +64,32 @@ function Login-MyAzureGov {
  .Parameter ResourceGroupName
   The name of the Azure Resource Group where the VMs are located.
 
+ .Parameter NoWait
+  Include this parameter in the command line to start VMs as a job rather than waiting for each one to successfully start
+
  .Example
   # Start all the VMs in the Resource Group 'Demo1'
   Start-MyAzureVMs -ResourceGroupName Demo1
+
+  # Start all the VMs in the Resource Group 'Demo1' in parallel
+  Start-MyAzureVMs -ResourceGroupName Demo1 -NoWait
 #>
 function Start-MyAzureVMs {
-    param([Parameter(Mandatory=$true)][string] $ResourceGroupName)
+    [cmdletbinding(SupportsShouldProcess=$True)]
+    param(
+        [Parameter(Mandatory=$true)][string] $ResourceGroupName,
+        [switch] $NoWait
+    )
 
-    get-azurermvm -ResourceGroupName $ResourceGroupName | ForEach-Object { Start-AzureRmVm -Name $_.Name -ResourceGroupName $_.ResourceGroupName }
+    Write-Verbose "NoWait: $($NoWait)"
+    if($PSCmdlet.ShouldProcess($ResourceGroupName, "Start VMs")){
+        if($NoWait -eq $true){
+            get-azurermvm -ResourceGroupName $ResourceGroupName | ForEach-Object { Start-AzureRmVm -Name $_.Name -ResourceGroupName $_.ResourceGroupName -AsJob }
+        }
+        else {
+            get-azurermvm -ResourceGroupName $ResourceGroupName | ForEach-Object { Start-AzureRmVm -Name $_.Name -ResourceGroupName $_.ResourceGroupName }
+        }
+    }
 }
 
 <# 
@@ -83,20 +101,39 @@ function Start-MyAzureVMs {
   This function retrieves all the Resource Groups in the current subscription
   and iterates through all the VMs in the Resouce Groups and stops them.
 
+ .Parameter NoWait
+  Include this parameter in the command line to start VMs as a job rather than waiting for each one to successfully start
+
  .Example
   # Stop all VMs in the Resource Group 'Demo1'
   Stop-MyAzureAllVMs
+
+  # Stop all VMs in the Resource Group 'Demo1' in parallel
+  Stop-MyAzureAllVMs -NoWait
 #>
 function Stop-MyAzureAllVMs {
+    [cmdletbinding(SupportsShouldProcess=$True)]
+    param([switch]$NoWait)
 
-    Get-AzureRmResourceGroup | ForEach-Object {
-        Write-Verbose "Stopping VMs in Resource Group $($_.ResourceGroupName)"
-        Get-AzureRMVM -ResourceGroupName $_.ResourceGroupName | ForEach-Object {
-            Write-Verbose "Stopping VM $($_.Name) in Resource Group $($_.ResourceGroupName)"
-            Stop-AzureRmVM -Name $_.Name -ResourceGroupName $_.ResourceGroupName -Force
-        } 
+    Write-Verbose "NoWait: $($NoWait)"
+    if($PSCmdlet.ShouldProcess("All Resource Groups", "Don't Wait: $($NoWait)"))
+    {
+        Get-AzureRmResourceGroup | ForEach-Object {
+            Write-Verbose "Stopping VMs in Resource Group $($_.ResourceGroupName)"
+            Get-AzureRmVm -ResourceGroupName $_.ResourceGroupName | ForEach-Object {
+                Write-Verbose "Stopping VM $($_.Name) in Resource Group $($_.ResourceGroupName)"
+                if($NoWait -eq $true) 
+                {
+                    Stop-AzureRmVM -Name $_.Name -ResourceGroupName $_.ResourceGroupName -Force -AsJob
+                }
+                else 
+                {
+                    Stop-AzureRmVM -Name $_.Name -ResourceGroupName $_.ResourceGroupName -Force
+                }
+                
+            } 
+        }
     }
-
 }
 
 <# 
@@ -109,15 +146,37 @@ function Stop-MyAzureAllVMs {
 
  .Parameter ResourceGroupName
   The name of the Azure Resource Group where the VMs are located.
-  
+
+ .Parameter NoWait
+  Include this parameter in the command line to start VMs as a job rather than waiting for each one to successfully start
+
  .Example
   # Stop all VMs in the Resource Group 'Demo1'
   Stop-MyAzureVMs -ResourceGroupName Demo1
+
+  # Stop all VMs in the Resource Group 'Demo1' in parallel
+  Stop-MyAzureVMs -ResourceGroupName Demo1 -NoWait
 #>
 function Stop-MyAzureVMs {
-    param([Parameter(Mandatory=$true)][string] $ResourceGroupName)
+    [cmdletbinding(SupportsShouldProcess=$True)]
+    param(
+        [Parameter(Mandatory=$true)][string] $ResourceGroupName,
+        [switch] $NoWait
+    )
 
-    get-azurermvm -ResourceGroupName $ResourceGroupName | ForEach-Object { Stop-AzureRmVm -Name $_.Name -ResourceGroupName $_.ResourceGroupName -force }
+    Write-Verbose "NoWait: $($NoWait)"
+    if($PSCmdlet.ShouldProcess($ResourceGroupName, "Stop VMs"))
+    {
+        if($NoWait -eq $true)
+        {
+            get-azurermvm -ResourceGroupName $ResourceGroupName | ForEach-Object { Stop-AzureRmVm -Name $_.Name -ResourceGroupName $_.ResourceGroupName -force -AsJob }
+        }
+        else 
+        {
+            get-azurermvm -ResourceGroupName $ResourceGroupName | ForEach-Object { Stop-AzureRmVm -Name $_.Name -ResourceGroupName $_.ResourceGroupName -force }
+        }
+        
+    }
 }
 
 <# 

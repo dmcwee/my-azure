@@ -27,8 +27,7 @@ This command calls the Login-AzureRmAccount targeting the US Government Azure cl
 
 **Start-MyAzureVMs**
 
-This command takes a resource group and then iterates across all the VMs within that resource group and starts them.  Currently,
-this command performs these tasks in series, but future versions will include a parallel capability.
+This command takes a resource group and then iterates across all the VMs within that resource group and starts them.
 
 # Stop VMs
 This modules includes two commands to stop Azure VMs
