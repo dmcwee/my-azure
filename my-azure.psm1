@@ -13,6 +13,23 @@ function Get-MyAzureVersion {
     Get-Module -ListAvailable | Where-Object { $_.Name -eq 'Azure' } | Format-Table -Property Name,Version
 }
 
+<#
+ .Synopsis
+  Get the Power State of the VMs in the resource group
+
+ .Description
+  Queries the Azure VMs in the provided resource group and displays their names and current PowerState
+
+ .Example
+  # Show the power status of all the VMs in resource group 'Demo1'
+  Get-MyAzureVmStatus -ResourceGroupName Demo1
+#>
+function Get-MyAzureVmStatus {
+    param([Parameter(Mandatory=$true)][string] $ResourceGroupName)
+
+    Get-AzureRmVm -ResourceGroupName $ResourceGroupName -Status | Format-Table -Property Name, ResourceGroupName, PowerState
+}
+
 <# 
  .Synopsis
   Login to an Azure Context

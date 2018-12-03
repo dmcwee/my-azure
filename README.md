@@ -52,3 +52,7 @@ which subscription they would like to make use of.
 **Get-MyAzureVersion**
 
 This command queries the list of available modules which include Azure in the name and then prints a table with their name and version numbers.
+
+**Get-MyAzureVmStatus**
+
+Queries the Azure VMs in the provided resource group and displays their names and current Status
