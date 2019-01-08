@@ -30,6 +30,22 @@ function Get-MyAzureVmStatus {
     Get-AzureRmVm -ResourceGroupName $ResourceGroupName -Status | Format-Table -Property Name, ResourceGroupName, PowerState
 }
 
+<#
+#>
+function Get-MyAzureWindowsVersions {
+    #Write-Host "Microsoft VM Image Publishers:"
+    #Get-AzureRmVMImagePublisher -Location eastus | Where-Object { $_.PublisherName -like "*icrosoft*" }
+
+    Write-Host "Microsoft Windows-Hub VM Image SKUs"
+    Get-AzureRmVMImageSku -Location eastus -PublisherName MicrosoftWindowsServer -Offer Windows-Hub
+
+    Write-Host "Microsoft Windows Server VM Image SKUs"
+    get-azurermvmimagesku -Location eastus -PublisherName MicrosoftWindowsServer -Offer WindowsServer
+
+    Write-Host "Microsoft Windows Client VM Image SKUs" 
+    get-azurermvmimagesku -Location eastus -PublisherName MicrosoftVisualStudio -Offer Windows
+}
+
 <# 
  .Synopsis
   Login to an Azure Context
@@ -95,12 +111,12 @@ function Start-MyAzureVMs {
     [cmdletbinding(SupportsShouldProcess=$True)]
     param(
         [Parameter(Mandatory=$true)][string] $ResourceGroupName,
-        [switch] $NoWait
+        [switch] $Wait
     )
 
-    Write-Verbose "NoWait: $($NoWait)"
+    Write-Verbose "Wait: $($Wait)"
     if($PSCmdlet.ShouldProcess($ResourceGroupName, "Start VMs")){
-        if($NoWait -eq $true){
+        if($Wait -eq $false){
             get-azurermvm -ResourceGroupName $ResourceGroupName | ForEach-Object { Start-AzureRmVm -Name $_.Name -ResourceGroupName $_.ResourceGroupName -AsJob }
         }
         else {
@@ -130,16 +146,16 @@ function Start-MyAzureVMs {
 #>
 function Stop-MyAzureAllVMs {
     [cmdletbinding(SupportsShouldProcess=$True)]
-    param([switch]$NoWait)
+    param([switch]$Wait)
 
-    Write-Verbose "NoWait: $($NoWait)"
-    if($PSCmdlet.ShouldProcess("All Resource Groups", "Don't Wait: $($NoWait)"))
+    Write-Verbose "NoWait: $($Wait)"
+    if($PSCmdlet.ShouldProcess("All Resource Groups", "Don't Wait: $($Wait)"))
     {
         Get-AzureRmResourceGroup | ForEach-Object {
             Write-Verbose "Stopping VMs in Resource Group $($_.ResourceGroupName)"
             Get-AzureRmVm -ResourceGroupName $_.ResourceGroupName | ForEach-Object {
                 Write-Verbose "Stopping VM $($_.Name) in Resource Group $($_.ResourceGroupName)"
-                if($NoWait -eq $true) 
+                if($Wait -eq $false) 
                 {
                     Stop-AzureRmVM -Name $_.Name -ResourceGroupName $_.ResourceGroupName -Force -AsJob
                 }
@@ -178,13 +194,13 @@ function Stop-MyAzureVMs {
     [cmdletbinding(SupportsShouldProcess=$True)]
     param(
         [Parameter(Mandatory=$true)][string] $ResourceGroupName,
-        [switch] $NoWait
+        [switch] $Wait
     )
 
-    Write-Verbose "NoWait: $($NoWait)"
+    Write-Verbose "NoWait: $($Wait)"
     if($PSCmdlet.ShouldProcess($ResourceGroupName, "Stop VMs"))
     {
-        if($NoWait -eq $true)
+        if($Wait -eq $false)
         {
             get-azurermvm -ResourceGroupName $ResourceGroupName | ForEach-Object { Stop-AzureRmVm -Name $_.Name -ResourceGroupName $_.ResourceGroupName -force -AsJob }
         }
