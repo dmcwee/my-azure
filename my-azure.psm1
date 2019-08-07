@@ -124,7 +124,14 @@ function Get-MyAzureWindowsVersions {
   Login-MyAzure
 #>
 function Login-MyAzure {
-    Login-AzureRmAccount
+    param([string] $Environment = "")
+
+    if([string]::IsNullOrEmpty($Environment)) {
+        Login-AzureRmAccount
+    }
+    else {
+        Login-AzureRmAccount -Environment $Environment
+    }
 
     $subs = Get-AzureRmSubscription
     if($subs.count -gt 1) {
@@ -147,7 +154,7 @@ function Login-MyAzure {
 
 #>
 function Login-MyAzureGov {
-    Login-AzureRmAccount -Environment AzureUSGovernment
+    Login-MyAzure -Environment AzureUSGovernment
 }
 
 <# 
