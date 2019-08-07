@@ -31,6 +31,70 @@ function Get-MyAzureVmStatus {
 }
 
 <#
+ .Synopsis
+  Display all the available VM publishers in a particular region
+
+ .Description
+  Lists all the VM Image Publishers, based on the provided filter or no filter at all, for a specific Azure region
+
+ .Example
+  # Show all the Microsoft Publishers for the default location (eastus)
+  Get-MyAzureVMPublishers -Filter "*Microsoft*"
+#>
+function Get-MyAzureVMPublishers {
+    param([string] $Location = "eastus", [string] $Filter = "")
+    if([string]::IsNullOrEmpty($Filter)) {
+        Get-AzureRmVMImagePublisher -Location $Location
+    }
+    else {
+        Get-AzureRmVMImagePublisher -Location $Location | Where-Object { $_.PublisherName -like $Filter }
+    }
+}
+
+<#
+ .Synopsis
+  Display all the available VM SKUs for a specific Publisher
+
+ .Description
+  Lists the available VM SKUs for the specified publisher and all of their associated Offers in the specified location
+
+ .Example
+  # Show all the Windows Server SKUs for the default location (eastus)
+  Find-MyAzureVmImageSkus
+#>
+function Get-MyAzureVMImageSkus {
+    param([string] $Location ="eastus", [string] $PublisherName = "MicrosoftWindowsServer")
+    Get-AzureRmVMImageOffer -Location $Location -PublisherName $PublisherName | ForEach-Object {
+        Get-AzureRmVMImageSku -Location $Location -PublisherName $PublisherName -Offer $_.Offer
+    }
+}
+
+<#
+ .Synopsis
+  Display all the available VM SKUs in a particular region
+
+ .Description
+  Queries the VM Image Publishers, their associated offers and then lists the available SKUs for that location
+
+ .Example
+  # Show all the Linux SKUs for the default location (eastus)
+  Find-MyAzureVMImages -PublisherFilter "*linux*"
+#>
+function Find-MyAzureVMImages {
+    param(
+        [string] $Location="eastus",
+        [Parameter(Mandatory=$true)][string] $PublisherFilter
+    )
+
+    Get-AzureRmVMImagePublisher -Location $Location | Where-Object { $_.PublisherName -like $PublisherFilter } | ForEach-Object {
+        $currentPub = $_
+        Get-AzureRmVMImageOffer -Location $Location -PublisherName $currentPub.PublisherName | ForEach-Object {
+            Get-AzureRmVMImageSku -Location $Location -PublisherName $currentPub.PublisherName -Offer $_.Offer
+        }
+    }
+}
+
+<#
 #>
 function Get-MyAzureWindowsVersions {
     #Write-Host "Microsoft VM Image Publishers:"
