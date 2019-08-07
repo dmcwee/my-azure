@@ -24,10 +24,10 @@ function Get-MyAzureVersion {
   # Show the power status of all the VMs in resource group 'Demo1'
   Get-MyAzureVmStatus -ResourceGroupName Demo1
 #>
-function Get-MyAzureVmStatus {
+function Get-MyAzureVMStatus {
     param([Parameter(Mandatory=$true)][string] $ResourceGroupName)
 
-    Get-AzureRmVm -ResourceGroupName $ResourceGroupName -Status | Format-Table -Property Name, ResourceGroupName, PowerState
+    Get-AzureRmVM -ResourceGroupName $ResourceGroupName -Status | Format-Table -Property Name, ResourceGroupName, PowerState
 }
 
 <#
