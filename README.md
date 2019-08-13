@@ -27,7 +27,8 @@ This command calls the Login-AzureRmAccount targeting the US Government Azure cl
 
 **Start-MyAzureVMs**
 
-This command takes a resource group and then iterates across all the VMs within that resource group and starts them.
+This command takes a resource group and then iterates across all the VMs within that resource group and starts them.  
+*8/13/19: Added the ability to filter, by VM name, which machines to start.*
 
 # Stop VMs
 This modules includes two commands to stop Azure VMs
@@ -37,6 +38,7 @@ This modules includes two commands to stop Azure VMs
 **Stop-MyAzureVMs**
 
 This command takes a resource group name as an argument and then iterates across the VMs within that resource group and stops them.
+*8/13/19: Added the ability to filter, by VM name, which machines to stop.*
 
 **Stop-MyAzureAllVMs**
 
@@ -44,8 +46,7 @@ This command iterates across all virtual machines within all resource groups in 
 
 **Switch-MyAzureSubscription**
 
-This command queries the account's subscriptions and provides a list of available subscriptions as well as prompting the user for 
-which subscription they would like to make use of.
+This command queries the account's subscriptions and provides a list of available subscriptions as well as prompting the user for which subscription they would like to make use of.
 
 # Other Utility Functions
 
@@ -56,3 +57,15 @@ This command queries the list of available modules which include Azure in the na
 **Get-MyAzureVmStatus**
 
 Queries the Azure VMs in the provided resource group and displays their names and current Status
+
+**Get-MyAzureVMPublishers**
+
+Displays a list of VM Publishers in the specified region (eastus is the default region), and you can also filter the list of publishers.
+*Added: 8/13/19*
+
+**Get-MyAzureVMImageSkus**
+Displays a list of the VM SKUs available in the specified region(eastus is the default region) for the specified VM Publisher (MicrosoftWindowsServer is the default Image Publisher).
+*Added: 8/13/19*
+
+**Find-MyAzureVMImages**
+Display a list of VM SKUs available from in the specified region(eastus is the default region) for any VM Publisher who matches the provided filter.
