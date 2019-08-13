@@ -182,16 +182,28 @@ function Start-MyAzureVMs {
     [cmdletbinding(SupportsShouldProcess=$True)]
     param(
         [Parameter(Mandatory=$true)][string] $ResourceGroupName,
+        [string]$VMNameFilter = "",
         [switch] $Wait
     )
 
     Write-Verbose "Wait: $($Wait)"
     if($PSCmdlet.ShouldProcess($ResourceGroupName, "Start VMs")){
         if($Wait -eq $false){
-            get-azurermvm -ResourceGroupName $ResourceGroupName | ForEach-Object { Start-AzureRmVm -Name $_.Name -ResourceGroupName $_.ResourceGroupName -AsJob }
+            if([string]::IsNullOrEmpty($VMNameFilter)) {
+                get-azurermvm -ResourceGroupName $ResourceGroupName | ForEach-Object { Start-AzureRmVm -Name $_.Name -ResourceGroupName $_.ResourceGroupName -AsJob }
+            }
+            else {
+                get-azurermvm -ResourceGroupName $ResourceGroupName | Where-Object { $_.Name -like $VMNameFilter } | ForEach-Object { Start-AzureRmVm -Name $_.Name -ResourceGroupName $_.ResourceGroupName -AsJob }
+            }
+            
         }
         else {
-            get-azurermvm -ResourceGroupName $ResourceGroupName | ForEach-Object { Start-AzureRmVm -Name $_.Name -ResourceGroupName $_.ResourceGroupName }
+            if([string]::IsNullOrEmpty($VMNameFilter)){
+                get-azurermvm -ResourceGroupName $ResourceGroupName | ForEach-Object { Start-AzureRmVm -Name $_.Name -ResourceGroupName $_.ResourceGroupName }
+            }
+            else {
+                get-azurermvm -ResourceGroupName $ResourceGroupName | Where-Object { $_.Name -like $VMNameFilter } | ForEach-Object { Start-AzureRmVm -Name $_.Name -ResourceGroupName $_.ResourceGroupName }
+            }
         }
     }
 }
@@ -265,6 +277,7 @@ function Stop-MyAzureVMs {
     [cmdletbinding(SupportsShouldProcess=$True)]
     param(
         [Parameter(Mandatory=$true)][string] $ResourceGroupName,
+        [string]$VMNameFilter = "",
         [switch] $Wait
     )
 
@@ -273,11 +286,21 @@ function Stop-MyAzureVMs {
     {
         if($Wait -eq $false)
         {
-            get-azurermvm -ResourceGroupName $ResourceGroupName | ForEach-Object { Stop-AzureRmVm -Name $_.Name -ResourceGroupName $_.ResourceGroupName -force -AsJob }
+            if([string]::IsNullOrEmpty($VMNameFilter)){
+                get-azurermvm -ResourceGroupName $ResourceGroupName | ForEach-Object { Stop-AzureRmVm -Name $_.Name -ResourceGroupName $_.ResourceGroupName -force -AsJob }
+            }
+            else {
+                get-azurermvm -ResourceGroupName $ResourceGroupName | Where-Object { $_.Name -like $VMNameFilter } | ForEach-Object { Stop-AzureRmVm -Name $_.Name -ResourceGroupName $_.ResourceGroupName -force -AsJob }
+            }
         }
         else 
         {
-            get-azurermvm -ResourceGroupName $ResourceGroupName | ForEach-Object { Stop-AzureRmVm -Name $_.Name -ResourceGroupName $_.ResourceGroupName -force }
+            if([string]::IsNullOrEmpty($VMNameFilter)){
+                get-azurermvm -ResourceGroupName $ResourceGroupName | ForEach-Object { Stop-AzureRmVm -Name $_.Name -ResourceGroupName $_.ResourceGroupName -force }
+            }
+            else {
+                get-azurermvm -ResourceGroupName $ResourceGroupName | Where-Object { $_.Name -like $VMNameFilter } | ForEach-Object { Stop-AzureRmVm -Name $_.Name -ResourceGroupName $_.ResourceGroupName -force }
+            }
         }
         
     }
