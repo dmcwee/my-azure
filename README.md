@@ -3,10 +3,13 @@ A Powershell Module to streamline some common tasks and needs.
 
 Installation
 ========
+*As of 11/1/2019 My-Azure has been updated to to use the Azure Az Module.  If you cannot upgrade to the Az Module you can get the latest version of My-Azure for the RM Modules by checking out the Release-AzureRm tag.*
+
+1. [Install the Azure AZ module](https://docs.microsoft.com/en-us/powershell/azure/install-az-ps?view=azps-2.8.0).
 1. If you don't have one already, create a *WindowsPowerShell* folder in your *Documents* folder
-2. If you don't have one already, create a *Modules* folder inside the *WindowsPowerShell* folder created in *Step 1*
-3. Clone this repository to the *Modules* folder created in *Step 2*
-4. Launch a Powershell window. The module will automatically load.
+1. If you don't have one already, create a *Modules* folder inside the *WindowsPowerShell* folder created in *Step 1*
+1. Clone this repository to the *Modules* folder created in *Step 2*
+1. Launch a Powershell window. The module will automatically load.
 
 # Login
 This module includes two login commands:
