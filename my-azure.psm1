@@ -10,7 +10,7 @@
   Get-MyAzureVersion
 #>
 function Get-MyAzureVersion {
-    Get-Module -ListAvailable | Where-Object { $_.Name -eq 'Azure' } | Format-Table -Property Name,Version
+    Get-Module -ListAvailable | Where-Object { $_.Name -eq 'Azure' -or $_.Name -like 'Az.*' } | Format-Table -Property Name,Version
 }
 
 <#
@@ -27,7 +27,7 @@ function Get-MyAzureVersion {
 function Get-MyAzureVMStatus {
     param([Parameter(Mandatory=$true)][string] $ResourceGroupName)
 
-    Get-AzureRmVM -ResourceGroupName $ResourceGroupName -Status | Format-Table -Property Name, ResourceGroupName, PowerState
+    Get-AzVM -ResourceGroupName $ResourceGroupName -Status | Format-Table -Property Name, ResourceGroupName, PowerState
 }
 
 <#
@@ -44,10 +44,10 @@ function Get-MyAzureVMStatus {
 function Get-MyAzureVMPublishers {
     param([string] $Location = "eastus", [string] $Filter = "")
     if([string]::IsNullOrEmpty($Filter)) {
-        Get-AzureRmVMImagePublisher -Location $Location
+        Get-AzVMImagePublisher -Location $Location
     }
     else {
-        Get-AzureRmVMImagePublisher -Location $Location | Where-Object { $_.PublisherName -like $Filter }
+        Get-AzVMImagePublisher -Location $Location | Where-Object { $_.PublisherName -like $Filter }
     }
 }
 
@@ -64,8 +64,8 @@ function Get-MyAzureVMPublishers {
 #>
 function Get-MyAzureVMImageSkus {
     param([string] $Location ="eastus", [string] $PublisherName = "MicrosoftWindowsServer")
-    Get-AzureRmVMImageOffer -Location $Location -PublisherName $PublisherName | ForEach-Object {
-        Get-AzureRmVMImageSku -Location $Location -PublisherName $PublisherName -Offer $_.Offer
+    Get-AzVMImageOffer -Location $Location -PublisherName $PublisherName | ForEach-Object {
+        Get-AzVMImageSku -Location $Location -PublisherName $PublisherName -Offer $_.Offer
     }
 }
 
@@ -86,10 +86,10 @@ function Find-MyAzureVMImages {
         [Parameter(Mandatory=$true)][string] $PublisherFilter
     )
 
-    Get-AzureRmVMImagePublisher -Location $Location | Where-Object { $_.PublisherName -like $PublisherFilter } | ForEach-Object {
+    Get-AzVMImagePublisher -Location $Location | Where-Object { $_.PublisherName -like $PublisherFilter } | ForEach-Object {
         $currentPub = $_
-        Get-AzureRmVMImageOffer -Location $Location -PublisherName $currentPub.PublisherName | ForEach-Object {
-            Get-AzureRmVMImageSku -Location $Location -PublisherName $currentPub.PublisherName -Offer $_.Offer
+        Get-AzVMImageOffer -Location $Location -PublisherName $currentPub.PublisherName | ForEach-Object {
+            Get-AzVMImageSku -Location $Location -PublisherName $currentPub.PublisherName -Offer $_.Offer
         }
     }
 }
@@ -98,16 +98,16 @@ function Find-MyAzureVMImages {
 #>
 function Get-MyAzureWindowsVersions {
     #Write-Host "Microsoft VM Image Publishers:"
-    #Get-AzureRmVMImagePublisher -Location eastus | Where-Object { $_.PublisherName -like "*icrosoft*" }
+    #Get-AzVMImagePublisher -Location eastus | Where-Object { $_.PublisherName -like "*icrosoft*" }
 
     Write-Host "Microsoft Windows-Hub VM Image SKUs"
-    Get-AzureRmVMImageSku -Location eastus -PublisherName MicrosoftWindowsServer -Offer Windows-Hub
+    Get-AzVMImageSku -Location eastus -PublisherName MicrosoftWindowsServer -Offer Windows-Hub
 
     Write-Host "Microsoft Windows Server VM Image SKUs"
-    get-azurermvmimagesku -Location eastus -PublisherName MicrosoftWindowsServer -Offer WindowsServer
+    get-Azvmimagesku -Location eastus -PublisherName MicrosoftWindowsServer -Offer WindowsServer
 
     Write-Host "Microsoft Windows Client VM Image SKUs" 
-    get-azurermvmimagesku -Location eastus -PublisherName MicrosoftVisualStudio -Offer Windows
+    get-Azvmimagesku -Location eastus -PublisherName MicrosoftVisualStudio -Offer Windows
 }
 
 <# 
@@ -121,23 +121,23 @@ function Get-MyAzureWindowsVersions {
   subscription.
 
  .Example
-  Login-MyAzure
+  Connect-MyAzure
 #>
-function Login-MyAzure {
+function Connect-MyAzure {
     param([string] $Environment = "")
 
     if([string]::IsNullOrEmpty($Environment)) {
-        Login-AzureRmAccount
+        Connect-AzAccount
     }
     else {
-        Login-AzureRmAccount -Environment $Environment
+        Connect-AzAccount -Environment $Environment
     }
 
-    $subs = Get-AzureRmSubscription
+    $subs = Get-AzSubscription
     if($subs.count -gt 1) {
         $subs | format-table -Property @{name="Index";expression={$subs.IndexOf($_)}},Name,SubscriptionId
         $x = Read-Host -Prompt "Please Input the Index of the Subscription you wish to use: "
-        Set-AzureRmContext -SubscriptionId $subs[$x]  
+        Set-AzContext -SubscriptionId $subs[$x]  
     }
     
 }
@@ -150,11 +150,11 @@ function Login-MyAzure {
   Login to Azure for Government (GCC High)
 
  .Example
-  Login-MyAzureGov
+  Connect-MyAzureGov
 
 #>
-function Login-MyAzureGov {
-    Login-MyAzure -Environment AzureUSGovernment
+function Connect-MyAzureGov {
+    Connect-MyAzure -Environment AzureUSGovernment
 }
 
 <# 
@@ -190,19 +190,19 @@ function Start-MyAzureVMs {
     if($PSCmdlet.ShouldProcess($ResourceGroupName, "Start VMs")){
         if($Wait -eq $false){
             if([string]::IsNullOrEmpty($VMNameFilter)) {
-                get-azurermvm -ResourceGroupName $ResourceGroupName | ForEach-Object { Start-AzureRmVm -Name $_.Name -ResourceGroupName $_.ResourceGroupName -AsJob }
+                get-Azvm -ResourceGroupName $ResourceGroupName | ForEach-Object { Start-AzVm -Name $_.Name -ResourceGroupName $_.ResourceGroupName -AsJob }
             }
             else {
-                get-azurermvm -ResourceGroupName $ResourceGroupName | Where-Object { $_.Name -like $VMNameFilter } | ForEach-Object { Start-AzureRmVm -Name $_.Name -ResourceGroupName $_.ResourceGroupName -AsJob }
+                get-Azvm -ResourceGroupName $ResourceGroupName | Where-Object { $_.Name -like $VMNameFilter } | ForEach-Object { Start-AzVm -Name $_.Name -ResourceGroupName $_.ResourceGroupName -AsJob }
             }
             
         }
         else {
             if([string]::IsNullOrEmpty($VMNameFilter)){
-                get-azurermvm -ResourceGroupName $ResourceGroupName | ForEach-Object { Start-AzureRmVm -Name $_.Name -ResourceGroupName $_.ResourceGroupName }
+                get-Azvm -ResourceGroupName $ResourceGroupName | ForEach-Object { Start-AzVm -Name $_.Name -ResourceGroupName $_.ResourceGroupName }
             }
             else {
-                get-azurermvm -ResourceGroupName $ResourceGroupName | Where-Object { $_.Name -like $VMNameFilter } | ForEach-Object { Start-AzureRmVm -Name $_.Name -ResourceGroupName $_.ResourceGroupName }
+                get-Azvm -ResourceGroupName $ResourceGroupName | Where-Object { $_.Name -like $VMNameFilter } | ForEach-Object { Start-AzVm -Name $_.Name -ResourceGroupName $_.ResourceGroupName }
             }
         }
     }
@@ -234,17 +234,17 @@ function Stop-MyAzureAllVMs {
     Write-Verbose "NoWait: $($Wait)"
     if($PSCmdlet.ShouldProcess("All Resource Groups", "Don't Wait: $($Wait)"))
     {
-        Get-AzureRmResourceGroup | ForEach-Object {
+        Get-AzResourceGroup | ForEach-Object {
             Write-Verbose "Stopping VMs in Resource Group $($_.ResourceGroupName)"
-            Get-AzureRmVm -ResourceGroupName $_.ResourceGroupName | ForEach-Object {
+            Get-AzVm -ResourceGroupName $_.ResourceGroupName | ForEach-Object {
                 Write-Verbose "Stopping VM $($_.Name) in Resource Group $($_.ResourceGroupName)"
                 if($Wait -eq $false) 
                 {
-                    Stop-AzureRmVM -Name $_.Name -ResourceGroupName $_.ResourceGroupName -Force -AsJob
+                    Stop-AzVM -Name $_.Name -ResourceGroupName $_.ResourceGroupName -Force -AsJob
                 }
                 else 
                 {
-                    Stop-AzureRmVM -Name $_.Name -ResourceGroupName $_.ResourceGroupName -Force
+                    Stop-AzVM -Name $_.Name -ResourceGroupName $_.ResourceGroupName -Force
                 }
                 
             } 
@@ -287,19 +287,19 @@ function Stop-MyAzureVMs {
         if($Wait -eq $false)
         {
             if([string]::IsNullOrEmpty($VMNameFilter)){
-                get-azurermvm -ResourceGroupName $ResourceGroupName | ForEach-Object { Stop-AzureRmVm -Name $_.Name -ResourceGroupName $_.ResourceGroupName -force -AsJob }
+                get-Azvm -ResourceGroupName $ResourceGroupName | ForEach-Object { Stop-AzVm -Name $_.Name -ResourceGroupName $_.ResourceGroupName -force -AsJob }
             }
             else {
-                get-azurermvm -ResourceGroupName $ResourceGroupName | Where-Object { $_.Name -like $VMNameFilter } | ForEach-Object { Stop-AzureRmVm -Name $_.Name -ResourceGroupName $_.ResourceGroupName -force -AsJob }
+                get-Azvm -ResourceGroupName $ResourceGroupName | Where-Object { $_.Name -like $VMNameFilter } | ForEach-Object { Stop-AzVm -Name $_.Name -ResourceGroupName $_.ResourceGroupName -force -AsJob }
             }
         }
         else 
         {
             if([string]::IsNullOrEmpty($VMNameFilter)){
-                get-azurermvm -ResourceGroupName $ResourceGroupName | ForEach-Object { Stop-AzureRmVm -Name $_.Name -ResourceGroupName $_.ResourceGroupName -force }
+                get-Azvm -ResourceGroupName $ResourceGroupName | ForEach-Object { Stop-AzVm -Name $_.Name -ResourceGroupName $_.ResourceGroupName -force }
             }
             else {
-                get-azurermvm -ResourceGroupName $ResourceGroupName | Where-Object { $_.Name -like $VMNameFilter } | ForEach-Object { Stop-AzureRmVm -Name $_.Name -ResourceGroupName $_.ResourceGroupName -force }
+                get-Azvm -ResourceGroupName $ResourceGroupName | Where-Object { $_.Name -like $VMNameFilter } | ForEach-Object { Stop-AzVm -Name $_.Name -ResourceGroupName $_.ResourceGroupName -force }
             }
         }
         
@@ -319,11 +319,11 @@ function Stop-MyAzureVMs {
   Switch-MyAzureSubscription -ResourceGroupName Demo1
 #>
 function Switch-MyAzureSubscription {
-    $subs = Get-AzureRmSubscription
+    $subs = Get-AzSubscription
     if($subs.count -gt 1) {
         $subs | format-table -Property @{name="Index";expression={$subs.IndexOf($_)}},Name,SubscriptionId
         $x = Read-Host -Prompt "Please Input the Index of the Subscription you wish to use: "
-        Set-AzureRmContext -SubscriptionId $subs[$x]  
+        Set-AzContext -SubscriptionId $subs[$x]  
     }
     else {
         Write-Host "Only one Azure Subscription was found."
