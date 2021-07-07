@@ -1,5 +1,12 @@
 # My-Azure Changes
 
+## 7 July 2021
+**Tag:** Release-Az-1.1
+
+**Branches:** Master
+
+**Notes:** Added New-MyAzureDeployment and New-MyDSCPackage to allow for easier deployment of Azure Resource Group templates with custom DSC files
+
 ## 1 November 2019
 **Tag:** Release-Az
 

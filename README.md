@@ -72,3 +72,11 @@ Displays a list of the VM SKUs available in the specified region(eastus is the d
 
 **Find-MyAzureVMImages**
 Display a list of VM SKUs available from in the specified region(eastus is the default region) for any VM Publisher who matches the provided filter.
+
+**New-MyAzureDeployment**
+Create or use an Azure Resource Group and begin a new Azure ARM Template Deployment
+*Added: 7/7/21*
+
+**New-MyDSCPackage**
+Simple way to create a new DSC Package that includes 3rd party DSC modules like xActiveDirectory
+*Added: 7/7/21*

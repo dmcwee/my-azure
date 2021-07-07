@@ -329,3 +329,102 @@ function Switch-MyAzureSubscription {
         Write-Host "Only one Azure Subscription was found."
     }
 }
+
+<#
+ .Synopsis
+ Simple Resource Group Deployment Script
+
+ .Description
+ Checks if a resource group exists or creates a new resource group and begins a resource group deployment
+
+ .Parameter ResourceGroupName
+ Name of the existing resource group, or name of the resource group to create
+
+ .Parameter ResourceGroupLocation
+ Location of the resource group - only used when creating a new resource group
+
+ .Parameter TemplateFile
+ The Azure Resource Group Deployment JSON file
+
+ .Parameter TemplateParametersFile
+ The Azure Resource Group Deployment JSON file's optional template parameters file
+
+ .Example
+ New-MyAzureDeployment -ResourceGroupName Demo1 -Location eastus -TemplateFile azuredeploy.json -TemplateParametersFile azuredeploy.parameters.json
+#>
+function New-MyAzureDeployment {
+    [cmdletbinding(SupportsShouldProcess=$True)]
+    param(
+        [Parameter(Mandatory=$true)][string] $ResourceGroupName,
+        [Parameter(Mandatory=$true)][string] $ResourceGroupLocation,
+        [Parameter(Mandatory=$true)][string] $TemplateFile,
+        [string]$TemplateParametersFile = ""
+    )
+
+    $deploymentName = $ResourceGroupName + "_" + $(get-date -format MMddyyyyHHmmss) + "_deployment"
+    Write-Verbose "Starting Deployment $deploymentName"
+
+    if($PSCmdlet.ShouldProcess($deploymentName,"New Azure Deployment")) {
+        $resourceGroup = Get-AzResourceGroup -Name $ResourceGroupName -ErrorAction SilentlyContinue
+        if($null -eq $resourceGroup) {
+            Write-Verbose "Creating New Azure Resource Group $ResourceGroupName in $ResourceGroupLocation"
+            $resourceGroup = New-AzResourceGroup -Name $ResourceGroupName -Location $ResourceGroupLocation -ErrorAction Stop
+        }
+
+        if($TemplateParametersFile -ne "") {
+            Write-Verbose "Starting Resource Group Deployment $deploymentName with Parameter File $TemplateParametersFile"
+            New-AzResourceGroupDeployment -Name $deploymentName -ResourceGroupName $ResourceGroupName -TemplateFile $TemplateFile -TemplateParameterFile $TemplateParametersFile
+        }
+        else {
+            Write-Verbose "Starting Resource Group Deployment $deploymentName"
+            New-AzResourceGroupDeployment -Name $deploymentName -ResourceGroupName $ResourceGroupName -TemplateFile $TemplateFile
+        }
+        
+    }
+}
+
+<#
+ .Synopsis
+ Simple way to download and create a DSC zip file for use with Azure Resource Group Deployments
+
+ .Description
+ Download DSC Modules to the local folder and generate a zip with those modules and any custom scripts in the current directory
+
+ .Parameter DSCModulesPath
+ The folder location where the DSC Modules should be downloaded to and where the custom files exist - Include trailing '\' in commandline parameter
+
+ .Parameter DSCZipFile
+ Name of the ZIP'ed output file
+
+ .Parameter DSCModules
+ An array of DSC Modules that need to be downloaded to build the DSC Package
+
+ .Parameter ForceDSCDownloads
+ Force the download of the DSC Module even if the module exists locally
+
+ .Example
+ New-MyDSCPackage -DSCModulesPath .\dsc\ -DSCZipFile .\MyTestDSC.zip -DSCModules "xActiveDirectory","xTestingSomething"
+#>
+function New-MyDSCPackage {
+    [cmdletbind(SupportsShouldProcess=$true)]
+    Param(
+        [Parameter(Mandatory = $false)][string]$DSCModulesPath = ".\",
+        [Parameter(Mandatory = $false)][string]$DSCZipFile = ".\MyDSCPackage.zip",
+        [Parameter(Mandatory = $false)][string[]]$DSCModules = @("xActiveDirectory"),
+        [Switch]$ForceDSCDownloads
+    )
+
+    foreach ($dscMod in $DSCModules) {
+        if ($(test-path $($DSCModulesPath + $dscMod)) -eq $false) {
+            Find-Module -Name $dscMod | Save-Module -Path $DSCModulesPath
+        }
+        else {
+            Write-Verbose "The $dscMod folder already exists"
+            if ($ForceDSCDownloads) {
+                Find-Module -Name $dscMod | Save-Module -Path $DSCModulesPath -Force
+            }
+        }
+    }
+
+    Compress-Archive -Path $($DSCModulesPath + "*") $DSCZipFile -Force
+}
