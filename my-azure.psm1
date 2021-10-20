@@ -25,9 +25,18 @@ function Get-MyAzureVersion {
   Get-MyAzureVmStatus -ResourceGroupName Demo1
 #>
 function Get-MyAzureVMStatus {
-    param([Parameter(Mandatory=$true)][string] $ResourceGroupName)
+    param(
+        [Parameter(Mandatory=$true)][string] $ResourceGroupName,
+        [string] $TagName = "",
+        [string] $TagValue = ""
+    )
 
-    Get-AzVM -ResourceGroupName $ResourceGroupName -Status | Format-Table -Property Name, ResourceGroupName, PowerState
+    if([string]::IsNullOrEmpty($TagName) -or [string]::IsNullOrEmpty($TagValue)){
+        Get-AzVM -ResourceGroupName $ResourceGroupName -Status | Format-Table -Property Name, ResourceGroupName, PowerState
+    }
+    else {
+        Get-AzVM -ResourceGroupName $ResourceGroupName -Status | Where-Object { $_.Tags[$TagName] -eq $TagValue } | Format-Table -Property Name, ResourceGroupName, PowerState
+    }   
 }
 
 <#
@@ -183,26 +192,39 @@ function Start-MyAzureVMs {
     param(
         [Parameter(Mandatory=$true)][string] $ResourceGroupName,
         [string]$VMNameFilter = "",
+        [string]$TagName = "",
+        [string]$TagValue = "",
         [switch] $Wait
     )
 
     Write-Verbose "Wait: $($Wait)"
     if($PSCmdlet.ShouldProcess($ResourceGroupName, "Start VMs")){
         if($Wait -eq $false){
-            if([string]::IsNullOrEmpty($VMNameFilter)) {
-                get-Azvm -ResourceGroupName $ResourceGroupName | ForEach-Object { Start-AzVm -Name $_.Name -ResourceGroupName $_.ResourceGroupName -AsJob }
+            if(![string]::IsNullOrEmpty($VMNameFilter)) {
+                get-Azvm -ResourceGroupName $ResourceGroupName | Where-Object { $_.Name -like $VMNameFilter } | ForEach-Object { Start-AzVm -Name $_.Name -ResourceGroupName $_.ResourceGroupName -AsJob }
+            }
+            elseif (![string]::IsNullOrEmpty($TagName) -and ![string]::IsNullOrEmpty($TagValue)){
+                Write-Debug "Starting machines with $TagName : $TagValue"
+                Get-AzVM -ResourceGroupName $ResourceGroupName | Where-Object { $_.Tags[$TagName] -eq $TagValue } | ForEach-Object { 
+                    Write-Debug "Starting VM $($_.Name) in ResourceGroup $($_.ResourceGroupName)"
+                    Start-AzVm -Name $_.Name -ResourceGroupName $_.ResourceGroupName -AsJob 
+                }
             }
             else {
-                get-Azvm -ResourceGroupName $ResourceGroupName | Where-Object { $_.Name -like $VMNameFilter } | ForEach-Object { Start-AzVm -Name $_.Name -ResourceGroupName $_.ResourceGroupName -AsJob }
+                get-Azvm -ResourceGroupName $ResourceGroupName | ForEach-Object { Start-AzVm -Name $_.Name -ResourceGroupName $_.ResourceGroupName -AsJob }
+                
             }
             
         }
         else {
-            if([string]::IsNullOrEmpty($VMNameFilter)){
-                get-Azvm -ResourceGroupName $ResourceGroupName | ForEach-Object { Start-AzVm -Name $_.Name -ResourceGroupName $_.ResourceGroupName }
+            if(![string]::IsNullOrEmpty($VMNameFilter)){
+                get-Azvm -ResourceGroupName $ResourceGroupName | Where-Object { $_.Name -like $VMNameFilter } | ForEach-Object { Start-AzVm -Name $_.Name -ResourceGroupName $_.ResourceGroupName }
+            }
+            elseif (![string]::IsNullOrEmpty($TagName) -and ![string]::IsNullOrEmpty($TagValue)){
+                Get-AzVM -ResourceGroupName $ResourceGroupName | Where-Object { $_.Tags[$TagName] -eq $TagValue } | ForEach-Object { Start-AzVm -Name $_.Name -ResourceGroupName $_.ResourceGroupName }
             }
             else {
-                get-Azvm -ResourceGroupName $ResourceGroupName | Where-Object { $_.Name -like $VMNameFilter } | ForEach-Object { Start-AzVm -Name $_.Name -ResourceGroupName $_.ResourceGroupName }
+                get-Azvm -ResourceGroupName $ResourceGroupName | ForEach-Object { Start-AzVm -Name $_.Name -ResourceGroupName $_.ResourceGroupName }
             }
         }
     }
@@ -278,6 +300,8 @@ function Stop-MyAzureVMs {
     param(
         [Parameter(Mandatory=$true)][string] $ResourceGroupName,
         [string]$VMNameFilter = "",
+        [string]$TagName = "",
+        [string]$TagValue = "",
         [switch] $Wait
     )
 
@@ -286,20 +310,26 @@ function Stop-MyAzureVMs {
     {
         if($Wait -eq $false)
         {
-            if([string]::IsNullOrEmpty($VMNameFilter)){
-                get-Azvm -ResourceGroupName $ResourceGroupName | ForEach-Object { Stop-AzVm -Name $_.Name -ResourceGroupName $_.ResourceGroupName -force -AsJob }
+            if(![string]::IsNullOrEmpty($VMNameFilter)){
+                get-Azvm -ResourceGroupName $ResourceGroupName | Where-Object { $_.Name -like $VMNameFilter } | ForEach-Object { Stop-AzVm -Name $_.Name -ResourceGroupName $_.ResourceGroupName -force -AsJob }
+            }
+            elseif (![string]::IsNullOrEmpty($TagName) -and ![string]::IsNullOrEmpty($TagValue)){
+                Get-AzVM -ResourceGroupName $ResourceGroupName | Where-Object { $_.Tags[$TagName] -eq $TagValue } | ForEach-Object { Stop-AzVm -Name $_.Name -ResourceGroupName $_.ResourceGroupName -force -AsJob }
             }
             else {
-                get-Azvm -ResourceGroupName $ResourceGroupName | Where-Object { $_.Name -like $VMNameFilter } | ForEach-Object { Stop-AzVm -Name $_.Name -ResourceGroupName $_.ResourceGroupName -force -AsJob }
+                get-Azvm -ResourceGroupName $ResourceGroupName | ForEach-Object { Stop-AzVm -Name $_.Name -ResourceGroupName $_.ResourceGroupName -force -AsJob }
             }
         }
         else 
         {
-            if([string]::IsNullOrEmpty($VMNameFilter)){
-                get-Azvm -ResourceGroupName $ResourceGroupName | ForEach-Object { Stop-AzVm -Name $_.Name -ResourceGroupName $_.ResourceGroupName -force }
+            if(![string]::IsNullOrEmpty($VMNameFilter)){
+                get-Azvm -ResourceGroupName $ResourceGroupName | Where-Object { $_.Name -like $VMNameFilter } | ForEach-Object { Stop-AzVm -Name $_.Name -ResourceGroupName $_.ResourceGroupName -force }
+            }
+            elseif (![string]::IsNullOrEmpty($TagName) -and ![string]::IsNullOrEmpty($TagValue)){
+                Get-AzVM -ResourceGroupName $ResourceGroupName | Where-Object { $_.Tags[$TagName] -eq $TagValue } | ForEach-Object { Stop-AzVm -Name $_.Name -ResourceGroupName $_.ResourceGroupName -force }
             }
             else {
-                get-Azvm -ResourceGroupName $ResourceGroupName | Where-Object { $_.Name -like $VMNameFilter } | ForEach-Object { Stop-AzVm -Name $_.Name -ResourceGroupName $_.ResourceGroupName -force }
+                get-Azvm -ResourceGroupName $ResourceGroupName | ForEach-Object { Stop-AzVm -Name $_.Name -ResourceGroupName $_.ResourceGroupName -force }
             }
         }
         
