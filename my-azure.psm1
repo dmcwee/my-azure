@@ -1,3 +1,75 @@
+<# 
+ .Synopsis
+  Login to an Azure Context
+
+ .Description
+  Login to an Azure Context.  This function performs the azure login
+  and then checks if multiple subscriptions exist.  If multiple 
+  subscriptions exist the user is prompted to select the desired
+  subscription.
+
+ .Example
+  Connect-MyAzure
+#>
+function Connect-MyAzure {
+    param([string] $Environment = "")
+
+    if([string]::IsNullOrEmpty($Environment)) {
+        Connect-AzAccount
+    }
+    else {
+        Connect-AzAccount -Environment $Environment
+    }
+
+    $subs = Get-AzSubscription
+    if($subs.count -gt 1) {
+        $subs | format-table -Property @{name="Index";expression={$subs.IndexOf($_)}},Name,SubscriptionId
+        $x = Read-Host -Prompt "Please Input the Index of the Subscription you wish to use: "
+        Set-AzContext -SubscriptionId $subs[$x]  
+    }
+    
+}
+
+<# 
+ .Synopsis
+  Login to Azure for Government (GCC High)
+
+ .Description
+  Login to Azure for Government (GCC High)
+
+ .Example
+  Connect-MyAzureGov
+
+#>
+function Connect-MyAzureGov {
+    Connect-MyAzure -Environment AzureUSGovernment
+}
+
+<#
+ .Synopsis
+  Display all the available VM SKUs in a particular region
+
+ .Description
+  Queries the VM Image Publishers, their associated offers and then lists the available SKUs for that location
+
+ .Example
+  # Show all the Linux SKUs for the default location (eastus)
+  Find-MyAzureVMImages -PublisherFilter "*linux*"
+#>
+function Find-MyAzureVMImages {
+    param(
+        [string] $Location="eastus",
+        [Parameter(Mandatory=$true)][string] $PublisherFilter
+    )
+
+    Get-AzVMImagePublisher -Location $Location | Where-Object { $_.PublisherName -like $PublisherFilter } | ForEach-Object {
+        $currentPub = $_
+        Get-AzVMImageOffer -Location $Location -PublisherName $currentPub.PublisherName | ForEach-Object {
+            Get-AzVMImageSku -Location $Location -PublisherName $currentPub.PublisherName -Offer $_.Offer
+        }
+    }
+}
+
 <#
  .Synopsis
   Get the name and version number for the Azure Module that is loaded on the local machine.
@@ -80,30 +152,13 @@ function Get-MyAzureVMImageSkus {
 
 <#
  .Synopsis
-  Display all the available VM SKUs in a particular region
+ Gets the versions of windows available from the publishers
 
  .Description
-  Queries the VM Image Publishers, their associated offers and then lists the available SKUs for that location
+ Gets the Azure VM Image SKUs from Windows-Hub, WindowsServer, and Windows offers
 
  .Example
-  # Show all the Linux SKUs for the default location (eastus)
-  Find-MyAzureVMImages -PublisherFilter "*linux*"
-#>
-function Find-MyAzureVMImages {
-    param(
-        [string] $Location="eastus",
-        [Parameter(Mandatory=$true)][string] $PublisherFilter
-    )
-
-    Get-AzVMImagePublisher -Location $Location | Where-Object { $_.PublisherName -like $PublisherFilter } | ForEach-Object {
-        $currentPub = $_
-        Get-AzVMImageOffer -Location $Location -PublisherName $currentPub.PublisherName | ForEach-Object {
-            Get-AzVMImageSku -Location $Location -PublisherName $currentPub.PublisherName -Offer $_.Offer
-        }
-    }
-}
-
-<#
+ Get-MyAzureWindowsVersions
 #>
 function Get-MyAzureWindowsVersions {
     #Write-Host "Microsoft VM Image Publishers:"
@@ -119,51 +174,152 @@ function Get-MyAzureWindowsVersions {
     get-Azvmimagesku -Location eastus -PublisherName MicrosoftVisualStudio -Offer Windows
 }
 
-<# 
+<#
  .Synopsis
-  Login to an Azure Context
+ Simple Resource Group Deployment Script
 
  .Description
-  Login to an Azure Context.  This function performs the azure login
-  and then checks if multiple subscriptions exist.  If multiple 
-  subscriptions exist the user is prompted to select the desired
-  subscription.
+ Checks if a resource group exists or creates a new resource group and begins a resource group deployment
+
+ .Parameter ResourceGroupName
+ Name of the existing resource group, or name of the resource group to create
+
+ .Parameter ResourceGroupLocation
+ Location of the resource group - only used when creating a new resource group
+
+ .Parameter TemplateFile
+ The Azure Resource Group Deployment JSON file
+
+ .Parameter TemplateParametersFile
+ The Azure Resource Group Deployment JSON file's optional template parameters file
 
  .Example
-  Connect-MyAzure
+ New-MyAzureDeployment -ResourceGroupName Demo1 -Location eastus -TemplateFile azuredeploy.json -TemplateParametersFile azuredeploy.parameters.json
 #>
-function Connect-MyAzure {
-    param([string] $Environment = "")
+function New-MyAzureDeployment {
+    [cmdletbinding(SupportsShouldProcess=$True)]
+    param(
+        [Parameter(Mandatory=$true)][string] $ResourceGroupName,
+        [Parameter(Mandatory=$true)][string] $ResourceGroupLocation,
+        [Parameter(Mandatory=$true)][string] $TemplateFile,
+        [string]$TemplateParametersFile = ""
+    )
 
-    if([string]::IsNullOrEmpty($Environment)) {
-        Connect-AzAccount
-    }
-    else {
-        Connect-AzAccount -Environment $Environment
-    }
+    $deploymentName = $ResourceGroupName + "_" + $(get-date -format MMddyyyyHHmmss) + "_deployment"
+    Write-Verbose "Starting Deployment $deploymentName"
 
-    $subs = Get-AzSubscription
-    if($subs.count -gt 1) {
-        $subs | format-table -Property @{name="Index";expression={$subs.IndexOf($_)}},Name,SubscriptionId
-        $x = Read-Host -Prompt "Please Input the Index of the Subscription you wish to use: "
-        Set-AzContext -SubscriptionId $subs[$x]  
+    if($PSCmdlet.ShouldProcess($deploymentName,"New Azure Deployment")) {
+        $resourceGroup = Get-AzResourceGroup -Name $ResourceGroupName -ErrorAction SilentlyContinue
+        if($null -eq $resourceGroup) {
+            Write-Verbose "Creating New Azure Resource Group $ResourceGroupName in $ResourceGroupLocation"
+            $resourceGroup = New-AzResourceGroup -Name $ResourceGroupName -Location $ResourceGroupLocation -ErrorAction Stop
+        }
+
+        if($TemplateParametersFile -ne "") {
+            Write-Verbose "Starting Resource Group Deployment $deploymentName with Parameter File $TemplateParametersFile"
+            New-AzResourceGroupDeployment -Name $deploymentName -ResourceGroupName $ResourceGroupName -TemplateFile $TemplateFile -TemplateParameterFile $TemplateParametersFile
+        }
+        else {
+            Write-Verbose "Starting Resource Group Deployment $deploymentName"
+            New-AzResourceGroupDeployment -Name $deploymentName -ResourceGroupName $ResourceGroupName -TemplateFile $TemplateFile
+        }
+        
     }
-    
 }
 
-<# 
+<#
  .Synopsis
-  Login to Azure for Government (GCC High)
+ Simple way to download and create a DSC zip file for use with Azure Resource Group Deployments
 
  .Description
-  Login to Azure for Government (GCC High)
+ Download DSC Modules to the local folder and generate a zip with those modules and any custom scripts in the current directory
+
+ .Parameter DSCModulesPath
+ The folder location where the DSC Modules should be downloaded to and where the custom files exist - Include trailing '\' in commandline parameter
+
+ .Parameter DSCZipFile
+ Name of the ZIP'ed output file
+
+ .Parameter DSCModules
+ An array of DSC Modules that need to be downloaded to build the DSC Package
+
+ .Parameter ForceDSCDownloads
+ Force the download of the DSC Module even if the module exists locally
 
  .Example
-  Connect-MyAzureGov
-
+ New-MyDSCPackage -DSCModulesPath .\dsc\ -DSCZipFile .\MyTestDSC.zip -DSCModules "xActiveDirectory","xTestingSomething"
 #>
-function Connect-MyAzureGov {
-    Connect-MyAzure -Environment AzureUSGovernment
+function New-MyDSCPackage {
+    [cmdletbind(SupportsShouldProcess=$true)]
+    Param(
+        [Parameter(Mandatory = $false)][string]$DSCModulesPath = ".\",
+        [Parameter(Mandatory = $false)][string]$DSCZipFile = ".\MyDSCPackage.zip",
+        [Parameter(Mandatory = $false)][string[]]$DSCModules = @("xActiveDirectory"),
+        [Switch]$ForceDSCDownloads
+    )
+
+    foreach ($dscMod in $DSCModules) {
+        if ($(test-path $($DSCModulesPath + $dscMod)) -eq $false) {
+            Find-Module -Name $dscMod | Save-Module -Path $DSCModulesPath
+        }
+        else {
+            Write-Verbose "The $dscMod folder already exists"
+            if ($ForceDSCDownloads) {
+                Find-Module -Name $dscMod | Save-Module -Path $DSCModulesPath -Force
+            }
+        }
+    }
+
+    Compress-Archive -Path $($DSCModulesPath + "*") $DSCZipFile -Force
+}
+
+<#
+ .Synopsis
+ Creates a local Point 2 Site certificate for use with Azure Gateway deployments
+
+ .Description
+ This creates a local Self-Signed Root and Child certificate for use with Azure Gateway deployments. This also creates
+ a text file with the exported root certificate so the cert can be used across multiple deployments if desired.
+
+ Without any paramters this command will generate a root cert named P2SRootCert, a child cert P2SChildCert, and the exported
+ file rootcert.txt (in the local directory).
+
+ .Example
+ New-MyP2SCertificate -RootCertCN "p2scert_root" -ChildCertCN "p2scert_child" -CertOutputFile "folder\p2scert_root.txt"
+#>
+function New-MyP2SCertificate {
+    [cmdletbinding(SupportsShouldProcess=$True)]
+    Param(
+        [string]$RootCertCN = "P2SRootCert", 
+        [string]$ChildCertCN = "P2SChildCert",
+        [string]$CertOutputFile = "rootcert.txt",
+        [switch]$ShowRootCert
+    )
+
+    if($PSCmdlet.ShouldProcess($RootCertCN,"Creating Root Certificate")) {
+        $cert = New-SelfSignedCertificate -Type Custom -KeySpec Signature `
+        -Subject "CN=$RootCertCN" -KeyExportPolicy Exportable `
+        -HashAlgorithm sha256 -KeyLength 2048 `
+        -CertStoreLocation "Cert:\CurrentUser\My" -KeyUsageProperty Sign -KeyUsage CertSign
+    }
+
+    if($PSCmdlet.ShouldProcess($ChildCertCN,"Creating Child Certificate")) {
+        $childCert = New-SelfSignedCertificate -Type Custom -DnsName P2SChildCert -KeySpec Signature `
+        -Subject "CN=$ChildCertCN" -KeyExportPolicy Exportable `
+        -HashAlgorithm sha256 -KeyLength 2048 `
+        -CertStoreLocation "Cert:\CurrentUser\My" `
+        -Signer $cert -TextExtension @("2.5.29.37={text}1.3.6.1.5.5.7.3.2")
+    }
+
+    if($PSCmdlet.ShouldProcess($CertOutputFile,"Creating Root File")) {
+        $certString = [convert]::ToBase64String($cert.RawData)
+        if$($ShowRootCert) {
+            Write-Host "Root Cert String for Gateway: "
+            Write-Host $certString
+        }
+
+        $certString | Out-File -FilePath $CertOutputFile -Force
+    }
 }
 
 <# 
@@ -360,101 +516,3 @@ function Switch-MyAzureSubscription {
     }
 }
 
-<#
- .Synopsis
- Simple Resource Group Deployment Script
-
- .Description
- Checks if a resource group exists or creates a new resource group and begins a resource group deployment
-
- .Parameter ResourceGroupName
- Name of the existing resource group, or name of the resource group to create
-
- .Parameter ResourceGroupLocation
- Location of the resource group - only used when creating a new resource group
-
- .Parameter TemplateFile
- The Azure Resource Group Deployment JSON file
-
- .Parameter TemplateParametersFile
- The Azure Resource Group Deployment JSON file's optional template parameters file
-
- .Example
- New-MyAzureDeployment -ResourceGroupName Demo1 -Location eastus -TemplateFile azuredeploy.json -TemplateParametersFile azuredeploy.parameters.json
-#>
-function New-MyAzureDeployment {
-    [cmdletbinding(SupportsShouldProcess=$True)]
-    param(
-        [Parameter(Mandatory=$true)][string] $ResourceGroupName,
-        [Parameter(Mandatory=$true)][string] $ResourceGroupLocation,
-        [Parameter(Mandatory=$true)][string] $TemplateFile,
-        [string]$TemplateParametersFile = ""
-    )
-
-    $deploymentName = $ResourceGroupName + "_" + $(get-date -format MMddyyyyHHmmss) + "_deployment"
-    Write-Verbose "Starting Deployment $deploymentName"
-
-    if($PSCmdlet.ShouldProcess($deploymentName,"New Azure Deployment")) {
-        $resourceGroup = Get-AzResourceGroup -Name $ResourceGroupName -ErrorAction SilentlyContinue
-        if($null -eq $resourceGroup) {
-            Write-Verbose "Creating New Azure Resource Group $ResourceGroupName in $ResourceGroupLocation"
-            $resourceGroup = New-AzResourceGroup -Name $ResourceGroupName -Location $ResourceGroupLocation -ErrorAction Stop
-        }
-
-        if($TemplateParametersFile -ne "") {
-            Write-Verbose "Starting Resource Group Deployment $deploymentName with Parameter File $TemplateParametersFile"
-            New-AzResourceGroupDeployment -Name $deploymentName -ResourceGroupName $ResourceGroupName -TemplateFile $TemplateFile -TemplateParameterFile $TemplateParametersFile
-        }
-        else {
-            Write-Verbose "Starting Resource Group Deployment $deploymentName"
-            New-AzResourceGroupDeployment -Name $deploymentName -ResourceGroupName $ResourceGroupName -TemplateFile $TemplateFile
-        }
-        
-    }
-}
-
-<#
- .Synopsis
- Simple way to download and create a DSC zip file for use with Azure Resource Group Deployments
-
- .Description
- Download DSC Modules to the local folder and generate a zip with those modules and any custom scripts in the current directory
-
- .Parameter DSCModulesPath
- The folder location where the DSC Modules should be downloaded to and where the custom files exist - Include trailing '\' in commandline parameter
-
- .Parameter DSCZipFile
- Name of the ZIP'ed output file
-
- .Parameter DSCModules
- An array of DSC Modules that need to be downloaded to build the DSC Package
-
- .Parameter ForceDSCDownloads
- Force the download of the DSC Module even if the module exists locally
-
- .Example
- New-MyDSCPackage -DSCModulesPath .\dsc\ -DSCZipFile .\MyTestDSC.zip -DSCModules "xActiveDirectory","xTestingSomething"
-#>
-function New-MyDSCPackage {
-    [cmdletbind(SupportsShouldProcess=$true)]
-    Param(
-        [Parameter(Mandatory = $false)][string]$DSCModulesPath = ".\",
-        [Parameter(Mandatory = $false)][string]$DSCZipFile = ".\MyDSCPackage.zip",
-        [Parameter(Mandatory = $false)][string[]]$DSCModules = @("xActiveDirectory"),
-        [Switch]$ForceDSCDownloads
-    )
-
-    foreach ($dscMod in $DSCModules) {
-        if ($(test-path $($DSCModulesPath + $dscMod)) -eq $false) {
-            Find-Module -Name $dscMod | Save-Module -Path $DSCModulesPath
-        }
-        else {
-            Write-Verbose "The $dscMod folder already exists"
-            if ($ForceDSCDownloads) {
-                Find-Module -Name $dscMod | Save-Module -Path $DSCModulesPath -Force
-            }
-        }
-    }
-
-    Compress-Archive -Path $($DSCModulesPath + "*") $DSCZipFile -Force
-}
