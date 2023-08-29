@@ -1,4 +1,4 @@
 test*
 *.json
 *.crt
-*.psm1
+my-azure.psm1
