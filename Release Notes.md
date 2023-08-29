@@ -1,5 +1,12 @@
 # My-Azure Changes
 
+## 29 August 2023
+**Tag:** Release-Az-1.2.1
+
+**Branches:** Master
+
+**Notes:** Added install.ps1 to install & sign the module. Added `New-MyP2SCertificate` to support creating certificates for use with Azure Point-To-Site Gateways
+
 ## 7 July 2021
 **Tag:** Release-Az-1.1
 
