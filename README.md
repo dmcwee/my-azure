@@ -9,7 +9,10 @@ Installation
 1. If you don't have one already, create a *WindowsPowerShell* folder in your *Documents* folder
 1. If you don't have one already, create a *Modules* folder inside the *WindowsPowerShell* folder created in *Step 1*
 1. Clone this repository to the *Modules* folder created in *Step 2*
-1. Launch a Powershell window. The module will automatically load.
+1. Launch a Powershell window and navigate to the *Modules* folder.
+1. Run the `install.ps1` script.
+    1. When prompted for the root certificate install choose *Yes*
+1. The module will now be locally signed and trusted and will run with the `ExecutionPolicy` *AllSigned*
 
 # Login
 This module includes two login commands:
@@ -67,16 +70,25 @@ Displays a list of VM Publishers in the specified region (eastus is the default 
 *Added: 8/13/19*
 
 **Get-MyAzureVMImageSkus**
+
 Displays a list of the VM SKUs available in the specified region(eastus is the default region) for the specified VM Publisher (MicrosoftWindowsServer is the default Image Publisher).
 *Added: 8/13/19*
 
 **Find-MyAzureVMImages**
+
 Display a list of VM SKUs available from in the specified region(eastus is the default region) for any VM Publisher who matches the provided filter.
 
 **New-MyAzureDeployment**
+
 Create or use an Azure Resource Group and begin a new Azure ARM Template Deployment
 *Added: 7/7/21*
 
 **New-MyDSCPackage**
+
 Simple way to create a new DSC Package that includes 3rd party DSC modules like xActiveDirectory
 *Added: 7/7/21*
+
+**New-MyP2SCertificate**
+
+Creates a Root and Child certificate to support deployments that utilize Azure Point-to-Site Gateways
+*Added: 8/29/2023*
