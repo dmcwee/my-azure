@@ -90,5 +90,6 @@ Simple way to create a new DSC Package that includes 3rd party DSC modules like 
 
 **New-MyP2SCertificate**
 
-Creates a Root and Child certificate to support deployments that utilize Azure Point-to-Site Gateways
+Creates a Root and Child certificate to support deployments that utilize Azure Point-to-Site Gateways and generates a parameter file with the root cert export included in it.
 *Added: 8/29/2023*
+*Updated: 10/12/2023*
