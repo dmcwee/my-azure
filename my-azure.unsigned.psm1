@@ -250,7 +250,7 @@ function New-MyAzureDeployment {
  New-MyDSCPackage -DSCModulesPath .\dsc\ -DSCZipFile .\MyTestDSC.zip -DSCModules "xActiveDirectory","xTestingSomething"
 #>
 function New-MyDSCPackage {
-    [cmdletbind(SupportsShouldProcess=$true)]
+    [cmdletbinding(SupportsShouldProcess=$true)]
     Param(
         [Parameter(Mandatory = $false)][string]$DSCModulesPath = ".\",
         [Parameter(Mandatory = $false)][string]$DSCZipFile = ".\MyDSCPackage.zip",
@@ -285,40 +285,75 @@ function New-MyDSCPackage {
  file rootcert.txt (in the local directory).
 
  .Example
- New-MyP2SCertificate -RootCertCN "p2scert_root" -ChildCertCN "p2scert_child" -CertOutputFile "folder\p2scert_root.txt"
+ New-MyP2SCertificate -RootCertCN "p2scert_root" -ChildCertCN "p2scert_child" -OutputFile "folder\p2scert_root.txt"
 #>
 function New-MyP2SCertificate {
     [cmdletbinding(SupportsShouldProcess=$True)]
     Param(
         [string]$RootCertCN = "P2SRootCert", 
         [string]$ChildCertCN = "P2SChildCert",
-        [string]$CertOutputFile = "rootcert.txt",
-        [switch]$ShowRootCert
+        [string]$OutputFile = "azure.parameters.template.json",
+        [switch]$OutputRawFile
     )
 
     if($PSCmdlet.ShouldProcess($RootCertCN,"Creating Root Certificate")) {
-        $cert = New-SelfSignedCertificate -Type Custom -KeySpec Signature `
-        -Subject "CN=$RootCertCN" -KeyExportPolicy Exportable `
-        -HashAlgorithm sha256 -KeyLength 2048 `
-        -CertStoreLocation "Cert:\CurrentUser\My" -KeyUsageProperty Sign -KeyUsage CertSign
+        $dnsName = $RootCertCN + "@davidmcwee.com"
+        
+        $cert = Get-ChildItem -Path Cert:\CurrentUser\My -DnsName $dnsName -ErrorAction SilentlyContinue
+        if($null -eq $cert) {
+            Write-Debug "Creating New Root Certificate: $RootCertCN ($dnsName)"
+
+            $cert = New-SelfSignedCertificate -Type Custom -KeySpec Signature `
+            -Subject "CN=$RootCertCN" -KeyExportPolicy Exportable `
+            -HashAlgorithm sha256 -KeyLength 2048 `
+            -DnsName $dnsName `
+            -CertStoreLocation "Cert:\CurrentUser\My" -KeyUsageProperty Sign -KeyUsage CertSign
+        }
     }
 
     if($PSCmdlet.ShouldProcess($ChildCertCN,"Creating Child Certificate")) {
-        $childCert = New-SelfSignedCertificate -Type Custom -DnsName P2SChildCert -KeySpec Signature `
-        -Subject "CN=$ChildCertCN" -KeyExportPolicy Exportable `
-        -HashAlgorithm sha256 -KeyLength 2048 `
-        -CertStoreLocation "Cert:\CurrentUser\My" `
-        -Signer $cert -TextExtension @("2.5.29.37={text}1.3.6.1.5.5.7.3.2")
+        $dnsName = $ChildCertCN + "@davidmcwee.com"
+        $childCert = Get-ChildItem -Path Cert:\CurrentUser\My -DnsName $dnsName -ErrorAction SilentlyContinue
+
+        if($null -eq $childCert) {
+            Write-Debug "Creating New Child Certificate: $ChildCertCN ($dnsName)"
+
+            $childCert = New-SelfSignedCertificate -Type Custom -KeySpec Signature `
+            -Subject "CN=$ChildCertCN" -KeyExportPolicy Exportable `
+            -HashAlgorithm sha256 -KeyLength 2048 `
+            -DnsName $dnsName `
+            -CertStoreLocation "Cert:\CurrentUser\My" -Signer $cert -TextExtension @("2.5.29.37={text}1.3.6.1.5.5.7.3.2")
+        }
     }
 
-    if($PSCmdlet.ShouldProcess($CertOutputFile,"Creating Root File")) {
+    if($PSCmdlet.ShouldProcess($OutputFile,"Creating Output File")) {
         $certString = [convert]::ToBase64String($cert.RawData)
-        if$($ShowRootCert) {
-            Write-Host "Root Cert String for Gateway: "
-            Write-Host $certString
+        Write-Debug "Root Cert String for Gateway: "
+        Write-Debug $certString
+
+        $outfile = $OutputFile
+        if($OutputRawFile -and $outfile -notlike "*.txt") {
+            $outfile = $outfile + ".txt"
+        }
+        elseif (!$OutputRawFile -and $outfile -notlike "*.json") {
+            $outfile = $outfile + ".json"
         }
 
-        $certString | Out-File -FilePath $CertOutputFile -Force
+        if($OutputRawFile) {
+            $output = $certString
+        }
+        else {
+            $template = $PSScriptRoot + "/azure.parameters.template.json"
+            Write-Debug "Template File $template"
+        
+            $paramobj = Get-Content $template -Raw | ConvertFrom-Json
+            $paramobj.parameters.gatewayCertName.value = $RootCertCN
+            $paramobj.parameters.gatewayCertData.value = $certString
+
+            $output = $paramobj | ConvertTo-Json -Depth 4
+        }
+
+        $output | Out-File -FilePath $outfile -Force
     }
 }
 
