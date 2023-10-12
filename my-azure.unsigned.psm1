@@ -202,7 +202,8 @@ function New-MyAzureDeployment {
         [Parameter(Mandatory=$true)][string] $ResourceGroupName,
         [Parameter(Mandatory=$true)][string] $ResourceGroupLocation,
         [Parameter(Mandatory=$true)][string] $TemplateFile,
-        [string]$TemplateParametersFile = ""
+        [string]$TemplateParametersFile = "",
+        [switch]$NewP2SCert
     )
 
     $deploymentName = $ResourceGroupName + "_" + $(get-date -format MMddyyyyHHmmss) + "_deployment"
@@ -216,6 +217,12 @@ function New-MyAzureDeployment {
         }
 
         if($TemplateParametersFile -ne "") {
+            if($NewP2SCert) {
+                $rootCert = $ResourceGroupName + "RootCert"
+                $childCert = $ResourceGroupName + "ChildCert"
+
+                New-MyP2SCertificate -RootCertCN $rootCert -ChildCertCN $childCert -OutputFile $TemplateParametersFile -TemplateParameterFile $TemplateParametersFile
+            }
             Write-Verbose "Starting Resource Group Deployment $deploymentName with Parameter File $TemplateParametersFile"
             New-AzResourceGroupDeployment -Name $deploymentName -ResourceGroupName $ResourceGroupName -TemplateFile $TemplateFile -TemplateParameterFile $TemplateParametersFile
         }
@@ -293,6 +300,7 @@ function New-MyP2SCertificate {
         [string]$RootCertCN = "P2SRootCert", 
         [string]$ChildCertCN = "P2SChildCert",
         [string]$OutputFile = "azure.parameters.template.json",
+        [string]$TemplateParameterFile,
         [switch]$OutputRawFile
     )
 
@@ -343,10 +351,14 @@ function New-MyP2SCertificate {
             $output = $certString
         }
         else {
-            $template = $PSScriptRoot + "/azure.parameters.template.json"
-            Write-Debug "Template File $template"
-        
-            $paramobj = Get-Content $template -Raw | ConvertFrom-Json
+            $content = Get-Content $TemplateParameterFile -Raw -ErrorAction SilentlyContinue
+            if($null -eq $content) {
+                $template = $PSScriptRoot + "/azure.parameters.template.json"
+                Write-Debug "Template File $template"
+                $content = Get-Content $template -Raw
+            }
+
+            $paramobj = $content | ConvertFrom-Json
             $paramobj.parameters.gatewayCertName.value = $RootCertCN
             $paramobj.parameters.gatewayCertData.value = $certString
 
@@ -354,6 +366,8 @@ function New-MyP2SCertificate {
         }
 
         $output | Out-File -FilePath $outfile -Force
+
+        $outfile
     }
 }
 
