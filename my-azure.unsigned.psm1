@@ -72,6 +72,79 @@ function Find-MyAzureVMImages {
 
 <#
  .Synopsis
+  Not intended for external use
+
+ .Description
+  This function is used internally to generate consisten URIs
+#>
+function Get-MyAzureScopeId {
+    param(
+        [Parameter(Mandatory=$true)][string]$SubscriptionId,
+        [string]$ResourceGroupName = "",
+        [string]$ResourceName = "",
+        [switch]$ResourceScope
+    )
+
+    $resourceProviderNamespace = "Microsoft.Compute"
+    $resourceType = "virtualMachines"
+
+    $scopeId = "subscriptions/$SubscriptionId"
+
+    if($ResourceScope) {
+        $scopeId = "subscriptions/$SubscriptionId/resourceGroups/$ResourceGroupName/providers/$resourceProviderNamespace/$resourceType/$ResourceName"
+    }
+
+    $scopeId
+}
+
+<#
+ .Synopsis
+  Queries the Defender for Cloud API for subscription or resource pricing plans
+
+ .Description
+  This command queries the Defender for Cloud API to determine what pricing plans are applied at the subscription or resource levels. If
+  the subscription ID is not provided then this will default to the item returned by Get-AzSubscription
+
+ .Example
+  # Get the pricing plan applied at the subscription level
+  Get-MyAzurePricing
+
+  # Get the pricing plan applied to a specific resource
+  Get-MyAzurePricing -ResourceGroupName Demo1 -ResourceName Vm1
+#>
+function Get-MyAzurePricing {
+    param(
+        [string]$ResourceGroupName = "",
+        [string]$ResourceName = "",
+        [string]$SubscriptionId = "",
+        [string]$AzureApiBase = "management.azure.com"
+    )
+
+    if($SubscriptionId -eq "") {
+        $SubscriptionId = $(Get-AzSubscription).Id
+    }
+
+    $scopeId = ""
+    if($ResourceName -eq "" -or $ResourceGroupName -eq "") {
+        $scopeId = Get-MyAzureScopeId -SubscriptionId $SubscriptionId
+    }
+    else {
+        $scopeId = Get-MyAzureScopeId -SubscriptionId $SubscriptionId -ResourceGroupName $ResourceGroupName -ResourceName $ResourceName -ResourceScope
+    }
+
+    $token = GetAzAccessToken | Select-Object -ExcludeProperty token
+    $uri = "https://$AzureApiBase/$scopeId/providers/Microsoft.Security/pricings?api-version=2024-01-01"
+
+    $response = Invoke-WebRequest -Method Get -Headers @{Authorization = "Bearer $token"} -Uri $uri
+    #$jsObj = $response.Content | ConvertFrom-Json
+
+    Write-Host "Response Code: $($response.StatusCode)"
+    Write-Host "Result: $($response.Content)"
+    # $jsObj | Format-List
+}
+
+<#
+ .Synopsis
   Get the name and version number for the Azure Module that is loaded on the local machine.
 
  .Description
@@ -359,8 +432,27 @@ function New-MyP2SCertificate {
             }
 
             $paramobj = $content | ConvertFrom-Json
-            $paramobj.parameters.gatewayCertName.value = $RootCertCN
-            $paramobj.parameters.gatewayCertData.value = $certString
+            if(Get-Member -InputObject $paramObj.parameters -name 'gatewayCertName'){
+                $paramobj.parameters.gatewayCertName.value = $RootCertCN
+            } 
+            else {
+                $paramobj.parameters | Add-Member @{
+                    gatewayCertName = @{
+                        value = $RootCertCN
+                    }
+                }
+            }
+
+            if(Get-Member -InputObject $paramObj.parameters -Name 'gatewayCertData') {
+                $paramobj.parameters.gatewayCertData.value = $certString
+            }
+            else {
+                $paramobj.parameters | Add-Member @{
+                    gatewayCertData = @{
+                        value = $certString
+                    }
+                }
+            }
 
             $output = $paramobj | ConvertTo-Json -Depth 4
         }
@@ -370,6 +462,77 @@ function New-MyP2SCertificate {
         $outfile
     }
 }
+
+<#
+ .Synopsis
+  Removing resource pricing
+
+ .Description
+  Removes the Defender for Cloud pricing applied to a specific resource. 
+
+ .Example
+  Remove-MyAzurePricing -ResourceGroupName rg1 -ResourceName vm1
+#>
+function Remove-MyAzurePricing {
+    param(
+        [string]$SubscriptionId = "",
+        [Parameter(Mandatory=$true)][string]$ResourceGroupName,
+        [Parameter(Mandatory=$true)][string]$ResourceName,
+        [string]$AzureApi = "management.azure.com"
+    )
+
+    $pricingName = "virtualMachines"
+
+    if($SubscriptionId -eq "") {
+        $SubscriptionId = $(Get-AzSubscription).Id
+    }
+
+    $scopeId = Get-MyAzureScopeId -SubscriptionId $SubscriptionId -ResourceGroupName $ResourceGroupName -ResourceName $ResourceName -ResourceScope
+    $uri = "https://$AzureApi/$scopeId/providers/Microsoft.Security/pricings/$($pricingName)?api-version=2024-01-01"
+
+    $response = Invoke-WebRequest -Method Delete -Uri $uri -Headers @{Authorization = "Bearer $token"}
+    Write-Host "Response Code: $($response.StatusCode)"
+}
+
+<#
+ .Synopsis
+  Set resource level pricing
+
+ .Description
+  Set the Defender for Cloud resource level pricing on a specific resource
+
+ .Parameter ResourceGroupName
+  The name of the Azure Resource Group where the VMs are located.
+
+ .Parameter ResourceName
+  The name of the Azure Resource (VM) that pricing should be updated for
+
+ .Example
+  # Start all the VMs in the Resource Group 'Demo1'
+  Set-MyAzurePricing -ResourceGroupName Demo1 -ResourceName Vm1
+#>
+function Set-MyAzurePricing {
+    param(
+        [string]$SubscriptionId = "",
+        [Parameter(Mandatory=$true)][string]$ResourceGroupName,
+        [Parameter(Mandatory=$true)][string]$ResourceName,
+        [string]$AzureApi = "management.azure.com"
+    )
+
+    $pricingName = "virtualMachines"
+
+    if($SubscriptionId -eq "") {
+        $SubscriptionId = $(Get-AzSubscription).Id
+    }
+
+    $scopeId = Get-MyAzureScopeId -SubscriptionId $SubscriptionId -ResourceGroupName $ResourceGroupName -ResourceName $ResourceName -ResourceScope
+    $uri = "https://$AzureApi/$scopeId/providers/Microsoft.Security/pricings/$($pricingName)?api-version=2024-01-01"
+
+    $response = Invoke-WebRequest -Method Put -Uri $uri -Headers @{Authorization = "Bearer $token"}
+    Write-Host "Response Code: $($response.StatusCode)"
+}
+
+
 
 <# 
  .Synopsis
