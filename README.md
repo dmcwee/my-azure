@@ -65,6 +65,7 @@ This command iterates across all virtual machines within all resource groups in 
 
 Create or use an Azure Resource Group and begin a new Azure ARM Template Deployment. This can create a Point-To-Site certificate pair, export the public root certificate, export the client certificate with private key, and update the deployment parameter file with the public root certificate key base64 string.
 *Added: 7/7/21*
+*Updated: 7/14/2025*
 
 ## Other Utility Functions
 
