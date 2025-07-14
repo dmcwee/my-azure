@@ -275,7 +275,9 @@ function New-MyAzureDeployment {
         [Parameter(Mandatory=$true)][string] $ResourceGroupName,
         [Parameter(Mandatory=$true)][string] $ResourceGroupLocation,
         [Parameter(Mandatory=$true)][string] $TemplateFile,
+        [Parameter(Mandatory=$true)][securestring] $Password,
         [string]$TemplateParametersFile = "",
+        [string]$OutputFilesPath = ".\",
         [switch]$NewP2SCert
     )
 
@@ -289,21 +291,40 @@ function New-MyAzureDeployment {
             $resourceGroup = New-AzResourceGroup -Name $ResourceGroupName -Location $ResourceGroupLocation -ErrorAction Stop
         }
 
-        if($TemplateParametersFile -ne "") {
-            if($NewP2SCert) {
-                $rootCert = $ResourceGroupName + "RootCert"
-                $childCert = $ResourceGroupName + "ChildCert"
-
-                New-MyP2SCertificate -RootCertCN $rootCert -ChildCertCN $childCert -OutputFile $TemplateParametersFile -TemplateParameterFile $TemplateParametersFile
+        if($resourceGroup) {
+            $params = @{
+                Name = $deploymentName
+                ResourceGroupName = $ResourceGroupName
+                TemplateFile = $TemplateFile
+                password = $Password
             }
-            Write-Verbose "Starting Resource Group Deployment $deploymentName with Parameter File $TemplateParametersFile"
-            New-AzResourceGroupDeployment -Name $deploymentName -ResourceGroupName $ResourceGroupName -TemplateFile $TemplateFile -TemplateParameterFile $TemplateParametersFile
+
+            if($NewP2SCert){
+                $rootParams = @{
+                    RootCertCN = $ResourceGroupName + "RootCert"
+                    ChildCertCN = $ResourceGroupName + "ChildCert"
+                    OutputPath = $OutputFilesPath
+                    OutputRawFiles = $true
+                    CertificatePassword = $Password
+                }
+
+                if($TemplateParametersFile -ne "") {
+                    $rootParams["TemplateParameterFile"] = $TemplateParametersFile
+                }
+
+                Write-Verbose "Creating new P2S Certificate with params"
+                $rootParams.GetEnumerator() | ForEach-Object { Write-Verbose "$($_.Key) = $($_.Value)" }
+                $paramFile = New-MyP2SCertificate @rootParams
+
+                Write-Verbose "New parameter file: $paramFile"
+                $params["TemplateParameterFile"] = $paramFile
+            }
+
+            New-AzResourceGroupDeployment @params
         }
         else {
-            Write-Verbose "Starting Resource Group Deployment $deploymentName"
-            New-AzResourceGroupDeployment -Name $deploymentName -ResourceGroupName $ResourceGroupName -TemplateFile $TemplateFile
-        }
-        
+            Write-Error "Resource Group does not exist. Deployment cannot continue."
+        }       
     }
 }
 
@@ -372,23 +393,28 @@ function New-MyP2SCertificate {
     Param(
         [string]$RootCertCN = "P2SRootCert", 
         [string]$ChildCertCN = "P2SChildCert",
-        [string]$OutputFile = "azure.parameters.template.json",
+        [string]$OutputPath,
         [string]$TemplateParameterFile,
-        [switch]$OutputRawFile
+        [securestring]$CertificatePassword,
+        [switch]$OutputRawFiles
     )
+
+    $commonParams = @{
+        Type = "Custom"
+        KeySpec = "Signature"
+        KeyLength = 2048
+        HashAlgorithm = "sha256"
+        KeyExportPolicy = "Exportable"
+        CertStoreLocation = "Cert:\CurrentUser\My"
+    }
 
     if($PSCmdlet.ShouldProcess($RootCertCN,"Creating Root Certificate")) {
         $dnsName = $RootCertCN + "@davidmcwee.com"
-        
         $cert = Get-ChildItem -Path Cert:\CurrentUser\My -DnsName $dnsName -ErrorAction SilentlyContinue
+
         if($null -eq $cert) {
             Write-Debug "Creating New Root Certificate: $RootCertCN ($dnsName)"
-
-            $cert = New-SelfSignedCertificate -Type Custom -KeySpec Signature `
-            -Subject "CN=$RootCertCN" -KeyExportPolicy Exportable `
-            -HashAlgorithm sha256 -KeyLength 2048 `
-            -DnsName $dnsName `
-            -CertStoreLocation "Cert:\CurrentUser\My" -KeyUsageProperty Sign -KeyUsage CertSign
+            $cert = New-SelfSignedCertificate @commonParams -Subject "CN=$RootCertCN" -DnsName $dnsName -KeyUsageProperty Sign -KeyUsage CertSign
         }
     }
 
@@ -398,68 +424,58 @@ function New-MyP2SCertificate {
 
         if($null -eq $childCert) {
             Write-Debug "Creating New Child Certificate: $ChildCertCN ($dnsName)"
-
-            $childCert = New-SelfSignedCertificate -Type Custom -KeySpec Signature `
-            -Subject "CN=$ChildCertCN" -KeyExportPolicy Exportable `
-            -HashAlgorithm sha256 -KeyLength 2048 `
-            -DnsName $dnsName `
-            -CertStoreLocation "Cert:\CurrentUser\My" -Signer $cert -TextExtension @("2.5.29.37={text}1.3.6.1.5.5.7.3.2")
+            $childCert = New-SelfSignedCertificate @commonParams -Subject "CN=$ChildCertCN" -DnsName $dnsName -Signer $cert -TextExtension @("2.5.29.37={text}1.3.6.1.5.5.7.3.2")
         }
     }
 
-    if($PSCmdlet.ShouldProcess($OutputFile,"Creating Output File")) {
+    if($PSCmdlet.ShouldProcess($OutputPath,"Creating Output Files")) {
         $certString = [convert]::ToBase64String($cert.RawData)
-        Write-Debug "Root Cert String for Gateway: "
-        Write-Debug $certString
 
-        $outfile = $OutputFile
-        if($OutputRawFile -and $outfile -notlike "*.txt") {
-            $outfile = $outfile + ".txt"
-        }
-        elseif (!$OutputRawFile -and $outfile -notlike "*.json") {
-            $outfile = $outfile + ".json"
+        #Write Base64 Public Certificate to file
+        if($OutputRawFiles) {
+            $outfile = "$OutputPath\$RootCertCN.cer"
+            $certString | Out-File -FilePath $outfile
+            $pfxCert = Export-PfxCertificate -Cert $childCert -FilePath "$OutputPath\$ChildCertCN.pfx" -Password $CertificatePassword
         }
 
-        if($OutputRawFile) {
-            $output = $certString
+        # If Template Parameter File provided then update it to include the root cert string
+        if(Test-Path -Path $TemplateParameterFile) {
+            Write-Verbose "Template File $TemplateParameterFile"
+            $content = Get-Content $TemplateParameterFile -Raw -ErrorAction SilentlyContinue
         }
         else {
-            $content = Get-Content $TemplateParameterFile -Raw -ErrorAction SilentlyContinue
-            if($null -eq $content) {
-                $template = $PSScriptRoot + "/azure.parameters.template.json"
-                Write-Debug "Template File $template"
-                $content = Get-Content $template -Raw
-            }
-
-            $paramobj = $content | ConvertFrom-Json
-            if(Get-Member -InputObject $paramObj.parameters -name 'gatewayCertName'){
-                $paramobj.parameters.gatewayCertName.value = $RootCertCN
-            } 
-            else {
-                $paramobj.parameters | Add-Member @{
-                    gatewayCertName = @{
-                        value = $RootCertCN
-                    }
-                }
-            }
-
-            if(Get-Member -InputObject $paramObj.parameters -Name 'gatewayCertData') {
-                $paramobj.parameters.gatewayCertData.value = $certString
-            }
-            else {
-                $paramobj.parameters | Add-Member @{
-                    gatewayCertData = @{
-                        value = $certString
-                    }
-                }
-            }
-
-            $output = $paramobj | ConvertTo-Json -Depth 4
+            $template = $PSScriptRoot + "\azure.parameters.template.json"
+            Write-Verbose "Template File $template"
+            $content = Get-Content $template -Raw 
         }
 
-        $output | Out-File -FilePath $outfile -Force
+        $paramobj = $content | ConvertFrom-Json
+        if(Get-Member -InputObject $paramObj.parameters -name 'gatewayCertName'){
+            $paramobj.parameters.gatewayCertName.value = $RootCertCN
+        } 
+        else {
+            $paramobj.parameters | Add-Member @{
+                gatewayCertName = @{
+                    value = $RootCertCN
+                }
+            }
+        }
 
-        $outfile
+        if(Get-Member -InputObject $paramObj.parameters -Name 'gatewayCertData') {
+            $paramobj.parameters.gatewayCertData.value = $certString
+        }
+        else {
+            $paramobj.parameters | Add-Member @{
+                gatewayCertData = @{
+                    value = $certString
+                }
+            }
+        }
+
+        $paramFile = "$OutputPath\azure.parameters.template.json"
+        $output = $paramobj | ConvertTo-Json -Depth 4
+        $output | Out-File -FilePath $paramFile -Force
+        return $paramFile
     }
 }
 
