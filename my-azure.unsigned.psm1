@@ -395,6 +395,8 @@ function New-MyP2SCertificate {
         [string]$ChildCertCN = "P2SChildCert",
         [string]$OutputPath,
         [string]$TemplateParameterFile,
+        [string]$CertificateNameParam = "gatewayCertName",
+        [string]$CertificateDataParam = "gatewayCertData",
         [securestring]$CertificatePassword,
         [switch]$OutputRawFiles
     )
@@ -450,23 +452,23 @@ function New-MyP2SCertificate {
         }
 
         $paramobj = $content | ConvertFrom-Json
-        if(Get-Member -InputObject $paramObj.parameters -name 'gatewayCertName'){
-            $paramobj.parameters.gatewayCertName.value = $RootCertCN
+        if(Get-Member -InputObject $paramObj.parameters -name $CertificateNameParam) {
+            $paramobj.parameters.$CertificateNameParam.value = $RootCertCN
         } 
         else {
             $paramobj.parameters | Add-Member @{
-                gatewayCertName = @{
+                $CertificateNameParam = @{
                     value = $RootCertCN
                 }
             }
         }
 
-        if(Get-Member -InputObject $paramObj.parameters -Name 'gatewayCertData') {
-            $paramobj.parameters.gatewayCertData.value = $certString
+        if(Get-Member -InputObject $paramObj.parameters -Name $CertificateDataParam) {
+            $paramobj.parameters.$CertificateDataParam.value = $certString
         }
         else {
             $paramobj.parameters | Add-Member @{
-                gatewayCertData = @{
+                $CertificateDataParam = @{
                     value = $certString
                 }
             }
