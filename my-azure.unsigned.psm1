@@ -437,7 +437,7 @@ function New-MyP2SCertificate {
         if($OutputRawFiles) {
             $outfile = "$OutputPath\$RootCertCN.cer"
             $certString | Out-File -FilePath $outfile
-            $pfxCert = Export-PfxCertificate -Cert $childCert -FilePath "$OutputPath\$ChildCertCN.pfx" -Password $CertificatePassword
+            Export-PfxCertificate -Cert $childCert -FilePath "$OutputPath\$ChildCertCN.pfx" -Password $CertificatePassword | out-null
         }
 
         # If Template Parameter File provided then update it to include the root cert string
