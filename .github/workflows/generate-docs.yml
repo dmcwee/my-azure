@@ -3,7 +3,7 @@ name: Generate Module Docs
 on:
   push:
     branches:
-      - main
+      - master
 
 jobs:
   generate-docs:
