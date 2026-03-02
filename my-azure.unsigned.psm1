@@ -299,6 +299,10 @@ function New-MyAzureDeployment {
                 password = $Password
             }
 
+            if($TemplateParametersFile -ne "") {
+                $params["TemplateParameterFile"] = $TemplateParametersFile
+            }
+
             if($NewP2SCert){
                 $rootParams = @{
                     RootCertCN = $ResourceGroupName + "RootCert"

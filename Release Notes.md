@@ -1,5 +1,8 @@
 # My-Azure Changes
 
+## 2 March 2026
+**Notes:** Fixing a template file bug.
+
 ## 29 August 2023
 **Tag:** Release-Az-1.2.1
 
