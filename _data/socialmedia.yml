@@ -1,0 +1,41 @@
+# This file stores the Social media links and sharing information used across the site.
+# By adding/removing items they will be added or removed to the site's top banner. Including a
+# shareurl and settings supportShare to true will cause the sharing link to be added
+# to the 'by line' on posts.
+
+- name: linkedin
+  username: dmcwee
+  iconclass: bi-linkedin
+  url: "https://www.linkedin.com/in/dmcwee/"
+  supportShare: false
+  shareurl: "https://www.linkedin.com/sharing/share-offsite/?url="
+- name: github
+  username: dmcwee
+  iconclass: bi-github
+  url: "https://github.com/dmcwee"
+- name: mastodon
+  username: dmcwee@infosec.exchange
+  iconclass: bi-mastodon
+  supportsShare: false
+  url: "https://infosec.exchange/@dmcwee"
+- name: threads
+  username: dmcwee
+  iconclass: bi-threads-fill
+  supportsShare: false
+  url: "https://www.threads.net/@dmcwee"
+- name: insta
+  username: dmcwee
+  iconclass: bi-instagram
+  supportsShare: false
+  url: "https://www.instagram.com/dmcwee"
+- name: bluesky
+  username: davidmcwee.com
+  iconclass: bi-cloud-sun-fill
+  supportsShare: false
+  url: "https://bsky.app/profile/davidmcwee.com"
+#  - name: twitter
+#    username: dmcwee
+#    iconclass: bi-twitter
+#    url: "https://twitter.com/dmcwee"
+#    supportShare: true
+#    shareurl: "https://twitter.com/intent/tweet?url="

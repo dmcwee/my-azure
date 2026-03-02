@@ -1,0 +1,57 @@
+name: Generate Module Docs
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  generate-docs:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout main branch
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Install and import platyPS and My-Azure modules
+        shell: pwsh
+        run: |
+          Install-Module -Name platyPS -Force -Scope CurrentUser
+          Import-Module platyPS
+          Import-Module ./My-Azure.psd1
+          New-MarkdownHelp -Module MyModule -OutputFolder ./docs
+
+      - name: Prepend date to generated filenames
+        shell: pwsh
+        run: |
+          $datePrefix = Get-Date -Format "yyyy-MM-dd-"
+          Get-ChildItem -Path ./docs -File | ForEach-Object {
+            $newName = "$datePrefix$($_.Name)"
+            Rename-Item -Path $_.FullName -NewName $newName
+          }
+
+      - name: Checkout gh-pages branch and copy docs
+        run: |
+          # Save generated docs to a temp location
+          cp -r ./docs /tmp/generated-docs
+          cp -r '*.md' /tmp/main-docs/.
+
+          # Fetch and checkout gh-pages
+          git fetch origin gh-pages
+          git checkout gh-pages
+
+          # Copy generated files into _posts
+          rm -rf _posts
+          mkdir -p _posts
+          cp /tmp/generated-docs/* _posts/
+          cp -f /tmp/main-docs/* .
+
+      - name: Commit and push to gh-pages
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add _posts/
+          git commit -m "Update docs - $(date +'%Y-%m-%d')" || echo "No changes to commit"
+          git push origin gh-pages

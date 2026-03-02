@@ -1,0 +1,27 @@
+# This file stores the navigation text and links for the site. These items are used to
+# create the navigation links in the site's banner.
+#
+# Only one level of navigation is supported currently.
+
+- name: Tenant Tracker
+  link: /tenant-tracker
+- name: Defender for Endpoint
+  link: /categories/mde
+- name: Defender for Identity
+  link: /categories/mdi
+- name: Defender for Office
+  link: /categories/mdo
+#- name: Defender for Cloud Apps
+#  link: /categories/mdca
+#- name: Defender for Cloud
+#  link: /categories/mdc
+#- name: Identity
+#  link: /categories/identity
+#- name: Security
+#  link: /categories/security
+- name: Labs
+  link: /labs
+#- name: Projects
+#  link: /projects
+- name: About
+  link: /about
