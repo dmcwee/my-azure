@@ -34,6 +34,8 @@ remote_theme: dmcwee/problog@p0.1.7
 plugins:
   - jekyll-feed
 permalink: /:title/
+include:
+  - README.md
 
 # Default Values
 defaults:
