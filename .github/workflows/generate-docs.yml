@@ -5,23 +5,25 @@ on:
     branches:
       - master
 
+
 jobs:
   generate-docs:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout main branch
         uses: actions/checkout@v4
-        with:
-          ref: main
 
       - name: Install and import platyPS and My-Azure modules
         shell: pwsh
         run: |
           Install-Module -Name platyPS -Force -Scope CurrentUser
           Import-Module platyPS
-          Import-Module ./My-Azure.psd1
-          New-MarkdownHelp -Module MyModule -OutputFolder ./docs
+          Copy-Item ./my-azure.unsigned.psm1 -Destination ./my-azure.psm1
+          Import-Module ./my-azure.psm1
+          New-MarkdownHelp -Module My-Azure -OutputFolder ./docs
 
       - name: Prepend date to generated filenames
         shell: pwsh
