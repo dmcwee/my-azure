@@ -37,8 +37,11 @@ jobs:
       - name: Checkout gh-pages branch and copy docs
         run: |
           # Save generated docs to a temp location
-          cp -r ./docs /tmp/generated-docs
-          cp -r *.md /tmp/main-docs/.
+          mkdir /tmp/generated-docs
+          mkdir /tmp/main-docs
+
+          rsync -a docs/ /tmp/generated-docs/
+          rsync -a *.md /tmp/main-docs/
 
           # Fetch and checkout gh-pages
           git fetch origin gh-pages
@@ -47,8 +50,8 @@ jobs:
           # Copy generated files into _posts
           rm -rf _posts
           mkdir -p _posts
-          cp /tmp/generated-docs/* _posts/
-          cp -f /tmp/main-docs/* .
+          rsync -a /tmp/generated-docs/ _posts/
+          rsync -a /tmp/main-docs/* .
 
       - name: Commit and push to gh-pages
         run: |
