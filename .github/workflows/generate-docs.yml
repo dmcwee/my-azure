@@ -38,7 +38,7 @@ jobs:
         run: |
           # Save generated docs to a temp location
           cp -r ./docs /tmp/generated-docs
-          cp -r '*.md' /tmp/main-docs/.
+          cp -r *.md /tmp/main-docs/.
 
           # Fetch and checkout gh-pages
           git fetch origin gh-pages
