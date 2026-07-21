@@ -217,10 +217,31 @@ function Get-MyAzureVMPublishers {
   Find-MyAzureVmImageSkus
 #>
 function Get-MyAzureVMImageSkus {
-    param([string] $Location ="eastus", [string] $PublisherName = "MicrosoftWindowsServer")
+    param([string] $Location ="eastus", 
+    [string] $PublisherName = "MicrosoftWindowsServer")
     Get-AzVMImageOffer -Location $Location -PublisherName $PublisherName | ForEach-Object {
         Get-AzVMImageSku -Location $Location -PublisherName $PublisherName -Offer $_.Offer
     }
+}
+
+function Get-MyAzureVmSkuGeneration {
+    param([string] $Location = "eastus",
+    [string] $SkuFilter = "Standard-D2*")
+    $output = @()
+    $computeSkus = Get-AzComputeResourceSku -Location $Location | Where-Object { $_.Name -like $SkuFilter }
+    $computeSkus | foreach-object {
+        $hyperVGen = $_.Capabilities | Where-Object { $_.Name -eq "HyperVGenerations" } | Select-Object -ExpandProperty Value
+        $vCPU = $_.Capabilities | Where-Object { $_.Name -eq "vCPUs" } | Select-Object -ExpandProperty Value
+        $memory = $_.Capabilities | Where-Object { $_.Name -eq "MemoryGB" } | Select-Object -ExpandProperty Value
+        $output += [PSCustomObject]@{
+            Name = $_.Name
+            HyperVGenerations = $hyperVGen
+            vCPUs = $vCPU
+            Memory = $memory
+        }
+    }
+
+    $output | Format-Table
 }
 
 <#
